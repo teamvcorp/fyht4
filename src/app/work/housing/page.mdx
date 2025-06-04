@@ -1,0 +1,55 @@
+import logo from '@/images/clients/family-fund/logomark-dark.svg'
+import imageHero from './housing.jpeg'
+import imageDebraFiscal from './debra-fiscal.jpg'
+
+export const caseStudy = {
+  client: 'Secure Housing',
+  title: 'Secure shelter regaurdless of income level.',
+  description:
+    'Once terms are set your housing and utilities are secure. Even if your hourly rate changes your shelter and utilities remain active and out of mind. Effortonomy says if you put the effort in you should not have to worry about bills.',
+  summary: [
+    'Knowing that your home and family are secure allows you to focus on your personal growth and development.',
+    'We partnered with VaCorp to create a platform that allows users to secure their housing and utilities for a set percentage of their income, regardless of their income level.',
+   ,
+  ],
+  logo,
+  image: { src: imageHero },
+  date: '2025-06',
+  service: 'Housing',
+  testimonial: {
+    author: { name: 'Robert Von Der Becke', role: 'Director of VaCorp' },
+    content:
+      'Working with Studio, we felt more like a partner than a customer. They really resonated with our mission to change the way people convince their parents to cash out their pensions.',
+  },
+}
+
+export const metadata = {
+  title: `${caseStudy.client} Case Study`,
+  description: caseStudy.description,
+}
+
+## Overview
+
+Effortonomy is about building a life of stability and growth through consistent effort, not wealth. When you have a secure home and reliable utilities, your mind is free to focus on your future, not just survival. By committing a set percentage of your income—regardless of the amount—you’re investing in peace of mind. We take care of everything else, so you can shift your energy from stress to personal growth, confidence, and long-term success.
+
+## What we did
+
+<TagList>
+  <TagListItem>Peace of Mind</TagListItem>
+  <TagListItem>Opportunity</TagListItem>
+  <TagListItem>Improved health</TagListItem>
+</TagList>
+
+<Blockquote
+  author={{ name: 'Robert Von Der Becke', role: 'Father' }}
+  image={{ src: imageDebraFiscal }}
+>
+  Working with Fyht I was able to focus on bettering myself and mspending time with my family. Fyht took the stress away by securing my home, utilities and acccess to nutrition. 
+</Blockquote>
+
+<StatList>
+  <StatListItem value="25%" label="Higher Savings" />
+  <StatListItem value="10x" label="Family time" />
+  <StatListItem value="100%" label="Peace of Mind" />
+  <StatListItem value="100%" label="Job Satisfaction" />
+</StatList>
