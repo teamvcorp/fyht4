@@ -9,28 +9,22 @@ import { List, ListItem } from '@/components/List'
 import { SectionIntro } from '@/components/SectionIntro'
 import { StylizedImage } from '@/components/StylizedImage'
 import { Testimonial } from '@/components/Testimonial'
-import logoBrightPath from '@/images/clients/bright-path/logo-light.svg'
-import logoFamilyFund from '@/images/clients/family-fund/logo-light.svg'
-import logoGreenLife from '@/images/clients/green-life/logo-light.svg'
-import logoHomeWork from '@/images/clients/home-work/logo-light.svg'
-import logoMailSmirk from '@/images/clients/mail-smirk/logo-light.svg'
-import logoNorthAdventures from '@/images/clients/north-adventures/logo-light.svg'
-import logoPhobiaDark from '@/images/clients/phobia/logo-dark.svg'
-import logoPhobiaLight from '@/images/clients/phobia/logo-light.svg'
-import logoUnseal from '@/images/clients/unseal/logo-light.svg'
-import imageLaptop from '@/images/laptop.jpg'
+import BrightlandLogoColor from '@/images/clients/brightland/brightlandLogo.png'
+import TKDColorLogo from '@/images/clients/Taekwondo/taekwondoLogo.png'
+import SantaLogo from '@/images/clients/santa/santaLogo.png'
+import CRFCLogo from '@/images/clients/crossroad/crossroadLogo.png'
+import Fyht4LogoLite from '@/images/clients/fight/fightLogo.png'
+import imageFam from '@/images/fam.png'
 import { type CaseStudy, type MDXEntry, loadCaseStudies } from '@/lib/mdx'
 import { RootLayout } from '@/components/RootLayout'
 
 const clients = [
-  ['Phobia', logoPhobiaLight],
-  ['Family Fund', logoFamilyFund],
-  ['Unseal', logoUnseal],
-  ['Mail Smirk', logoMailSmirk],
-  ['Home Work', logoHomeWork],
-  ['Green Life', logoGreenLife],
-  ['Bright Path', logoBrightPath],
-  ['North Adventures', logoNorthAdventures],
+  ['Taekwondo', TKDColorLogo],
+  ['Brightland', BrightlandLogoColor],
+  ['Santa', SantaLogo],
+  ['CRFC', CRFCLogo],
+  ['FYHT4', Fyht4LogoLite],
+ 
 ]
 
 function Clients() {
@@ -51,7 +45,12 @@ function Clients() {
             {clients.map(([client, logo]) => (
               <li key={client}>
                 <FadeIn>
-                  <Image src={logo} alt={client} unoptimized />
+                  <Image
+                  src={logo}
+                  alt={client}
+                  unoptimized
+                  className="max-w-[100px] max-h-[100px]"
+                  />
                 </FadeIn>
               </li>
             ))}
@@ -126,12 +125,12 @@ function Services() {
     <>
       <SectionIntro
         eyebrow="Services"
-        title="We help you identify, explore and respond to new opportunities."
+        title="We meet real needs with real-world solutions."
         className="mt-24 sm:mt-32 lg:mt-40"
       >
         <p>
-          As long as those opportunities involve giving us money to re-purpose
-          old projects — we can come up with an endless number of those.
+          Our mission is to uplift the community through access to technology, wellness,
+          nutrition, and behavioral support — blending innovation with compassion.
         </p>
       </SectionIntro>
       <Container className="mt-16">
@@ -139,31 +138,35 @@ function Services() {
           <div className="flex justify-center lg:w-1/2 lg:justify-end lg:pr-12">
             <FadeIn className="w-135 flex-none lg:w-180">
               <StylizedImage
-                src={imageLaptop}
+                src={imageFam}
                 sizes="(min-width: 1024px) 41rem, 31rem"
                 className="justify-center lg:justify-end"
               />
             </FadeIn>
           </div>
           <List className="mt-16 lg:mt-0 lg:w-1/2 lg:min-w-132 lg:pl-4">
-            <ListItem title="Web development">
-              We specialise in crafting beautiful, high quality marketing pages.
-              The rest of the website will be a shell that uses lorem ipsum
-              everywhere.
+            <ListItem title="Tech Education & Outreach">
+              We provide affordable website development, AI integration, youth coding programs,
+              and small business tech support — helping our community thrive in a digital world.
             </ListItem>
-            <ListItem title="Application development">
-              We have a team of skilled developers who are experts in the latest
-              app frameworks, like Angular 1 and Google Web Toolkit.
+            <ListItem title="Behavioral Growth through Storm Lake Taekwondo">
+              We use martial arts training to promote discipline, respect, and confidence in youth,
+              while offering supportive leadership opportunities for families and teens.
             </ListItem>
-            <ListItem title="E-commerce">
-              We are at the forefront of modern e-commerce development. Which
-              mainly means adding your logo to the Shopify store template we have
-              used for the past six years.
+            <ListItem title="Food Access through Alley Burger">
+              More than a restaurant — Alley Burger serves as a food access point, creating
+              nutritious, affordable options while funding outreach programs and youth employment.
             </ListItem>
-            <ListItem title="Custom content management">
-              At Studio we understand the importance of having a robust and
-              customised CMS. Thats why we run all of our client projects out
-              of a single, enormous Joomla instance.
+            <ListItem title="Family Connection through SOS (Spirit of Santa)">
+              SOS promotes behavioral and emotional development during the holidays and beyond,
+              by helping families reconnect through joy, giving, and acts of community kindness.
+            </ListItem>
+            <ListItem title="Family Wellness through Crossroad Family Center">
+              The CRFC offers fitness, behavioral health, nutrition, and life skills programs
+              to support long-term well-being for individuals and families in our region.
+            </ListItem>
+            <ListItem title="Family Safety and Security through Brightland Properties.">
+              Keeping families in stable housing with utilities by using effort-based economic solutions that value service and community participation over income alone.
             </ListItem>
           </List>
         </div>
@@ -172,9 +175,10 @@ function Services() {
   )
 }
 
+
 export const metadata: Metadata = {
   description:
-    'We are a development studio working at the intersection of design and technology.',
+    'We are a development studio working at the intersection of society and education.',
 }
 
 export default async function Home() {
@@ -199,11 +203,9 @@ export default async function Home() {
 
       <Testimonial
         className="mt-24 sm:mt-32 lg:mt-40"
-        client={{ name: 'Phobia', logo: logoPhobiaDark }}
+        client={{ name: 'tkd', logo: TKDColorLogo }}
       >
-        The team at Studio went above and beyond with our onboarding, even
-        finding a way to access the users microphone without triggering one of
-        those annoying permission dialogs.
+        TeamVCorp is fully commited to social change leading they way with programs that educate and guide postive behaviors and actions. Their work is a testament to the power of community and the impact of collective effort. We are proud to be part of this movement.
       </Testimonial>
 
       <Services />

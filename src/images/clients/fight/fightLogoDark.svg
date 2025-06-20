@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 481.15 305.96">
+  <defs>
+    <style>
+      .cls-1 {
+        font-family: MonaSans-Light, 'Mona Sans';
+        font-size: 145px;
+        font-variation-settings: 'wdth' 100, 'wght' 300;
+        font-weight: 300;
+      }
+
+      .cls-2 {
+        letter-spacing: .02em;
+      }
+
+      .cls-3 {
+        letter-spacing: -.11em;
+      }
+    </style>
+  </defs>
+  <text class="cls-1" transform="translate(0 272.03)"><tspan class="cls-2" x="0" y="0">F</tspan><tspan x="91.06" y="0">YH</tspan><tspan class="cls-3" x="297.97" y="0">T</tspan><tspan x="369.31" y="0">4</tspan></text>
+</svg>

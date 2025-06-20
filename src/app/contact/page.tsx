@@ -1,4 +1,5 @@
-import { useId } from 'react'
+'use client'
+import { useId, useState, ChangeEvent, FormEvent } from 'react'
 import { type Metadata } from 'next'
 import Link from 'next/link'
 
@@ -52,43 +53,67 @@ function RadioInput({
   )
 }
 
-function ContactForm() {
+export function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    phone: '',
+    message: '',
+  })
+
+  const [status, setStatus] = useState<string | null>(null)
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value })
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setStatus('Sending...')
+
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: 'admin@thevacorp.com',
+        subject: `New Contact Form Submission from ${formData.name}`,
+        html: `
+          <p><strong>Name:</strong> ${formData.name}</p>
+          <p><strong>Email:</strong> ${formData.email}</p>
+          <p><strong>Company:</strong> ${formData.company}</p>
+          <p><strong>Phone:</strong> ${formData.phone}</p>
+          <p><strong>Message:</strong><br/>${formData.message}</p>
+        `,
+      }),
+    })
+
+    const result = await res.json()
+    if (result.success) {
+      setStatus('✅ Message sent successfully!')
+      setFormData({ name: '', email: '', company: '', phone: '', message: '' })
+    } else {
+      setStatus(`❌ Error: ${result.error}`)
+    }
+  }
+
   return (
     <FadeIn className="lg:order-last">
-      <form>
-        <h2 className="font-display text-base font-semibold text-neutral-950">
-          Work inquiries
-        </h2>
+      <form onSubmit={handleSubmit}>
+        <h2 className="font-display text-base font-semibold text-neutral-950">Inquiries</h2>
         <div className="isolate mt-6 -space-y-px rounded-2xl bg-white/50">
-          <TextInput label="Name" name="name" autoComplete="name" />
-          <TextInput
-            label="Email"
-            type="email"
-            name="email"
-            autoComplete="email"
-          />
-          <TextInput
-            label="Company"
-            name="company"
-            autoComplete="organization"
-          />
-          <TextInput label="Phone" type="tel" name="phone" autoComplete="tel" />
-          <TextInput label="Message" name="message" />
-          <div className="border border-neutral-300 px-6 py-8 first:rounded-t-2xl last:rounded-b-2xl">
-            <fieldset>
-              <legend className="text-base/6 text-neutral-500">Budget</legend>
-              <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2">
-                <RadioInput label="$25K – $50K" name="budget" value="25" />
-                <RadioInput label="$50K – $100K" name="budget" value="50" />
-                <RadioInput label="$100K – $150K" name="budget" value="100" />
-                <RadioInput label="More than $150K" name="budget" value="150" />
-              </div>
-            </fieldset>
-          </div>
+          <TextInput label="Name" name="name" value={formData.name} onChange={handleChange} />
+          <TextInput label="Email" name="email" type="email" value={formData.email} onChange={handleChange} />
+          <TextInput label="Company" name="company" value={formData.company} onChange={handleChange} />
+          <TextInput label="Phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} />
+          <TextInput label="Message" name="message" value={formData.message} onChange={handleChange} />
         </div>
         <Button type="submit" className="mt-10">
-          Let’s work together
+          Let&apos;s work together
         </Button>
+        {status && <p className="mt-4 text-sm text-neutral-700">{status}</p>}
       </form>
     </FadeIn>
   )
@@ -101,8 +126,7 @@ function ContactDetails() {
         Our offices
       </h2>
       <p className="mt-6 text-base text-neutral-600">
-        Prefer doing things in person? We don’t but we have to list our
-        addresses here for legal reasons.
+        Prefer doing things in person? Stop by and say hello at one of our offices.
       </p>
 
       <Offices className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-2" />
@@ -113,8 +137,8 @@ function ContactDetails() {
         </h2>
         <dl className="mt-6 grid grid-cols-1 gap-8 text-sm sm:grid-cols-2">
           {[
-            ['Careers', 'careers@studioagency.com'],
-            ['Press', 'press@studioagency.com'],
+            ['Careers', 'admin@thevacorp.com'],
+            ['Press', 'teamvcorp@gmail.com'],
           ].map(([label, email]) => (
             <div key={email}>
               <dt className="font-semibold text-neutral-950">{label}</dt>
@@ -141,16 +165,12 @@ function ContactDetails() {
   )
 }
 
-export const metadata: Metadata = {
-  title: 'Contact Us',
-  description: 'Let’s work together. We can’t wait to hear from you.',
-}
 
 export default function Contact() {
   return (
     <RootLayout>
-      <PageIntro eyebrow="Contact us" title="Let’s work together">
-        <p>We can’t wait to hear from you.</p>
+      <PageIntro eyebrow="Contact us" title="Let&apos;s work together">
+        <p>We can&apos;t wait to hear from you.</p>
       </PageIntro>
 
       <Container className="mt-24 sm:mt-32 lg:mt-40">
