@@ -91,7 +91,9 @@ function CaseStudies({
   )
 }
 
-const clients = [
+import type { StaticImageData } from 'next/image'
+
+const clients: Array<[string, StaticImageData]> = [
   ['Taekwondo', TKDLogoColor],
   ['Brightland', brightlandLogo],
  
@@ -112,7 +114,7 @@ function Clients() {
           className="grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-3 lg:grid-cols-4"
         >
           {clients.map(([client, logo]) => (
-            <li key={client} className="group">
+            <li key={String(client)} className="group">
               <FadeIn className="overflow-hidden">
                 <Border className="pt-12 group-nth-[-n+2]:-mt-px sm:group-nth-3:-mt-px lg:group-nth-4:-mt-px">
                   <Image src={logo} alt={client} unoptimized />
