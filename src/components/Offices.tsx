@@ -38,6 +38,13 @@ export function Offices({
           Storm Lake, IA 50588
         </Office>
       </li>
+      <li>
+        <Office name="East Storm Lake" invert={invert}>
+          107 E Railroad
+          <br />
+          Storm Lake, IA 50588
+        </Office>
+      </li>
    
     </ul>
   )
