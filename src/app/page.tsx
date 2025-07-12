@@ -14,6 +14,7 @@ import TKDColorLogo from '@/images/clients/Taekwondo/taekwondoLogo.png'
 import SantaLogo from '@/images/clients/santa/santaLogo.png'
 import CRFCLogo from '@/images/clients/crossroad/crossroadLogo.png'
 import Fyht4LogoLite from '@/images/clients/fight/fightLogo.png'
+import HomeSchoolLogo from '@/images/clients/homeschool/homeschoolLogo.png'
 import imageFam from '@/images/fam.png'
 import { type CaseStudy, type MDXEntry, loadCaseStudies } from '@/lib/mdx'
 import { RootLayout } from '@/components/RootLayout'
@@ -24,6 +25,7 @@ const clients = [
   ['Santa', SantaLogo],
   ['CRFC', CRFCLogo],
   ['FYHT4', Fyht4LogoLite],
+  ['Homeschool', HomeSchoolLogo],
  
 ]
 

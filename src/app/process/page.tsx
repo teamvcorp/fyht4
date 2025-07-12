@@ -11,9 +11,9 @@ import { PageIntro } from '@/components/PageIntro'
 import { SectionIntro } from '@/components/SectionIntro'
 import { StylizedImage } from '@/components/StylizedImage'
 import { TagList, TagListItem } from '@/components/TagList'
-import imageLaptop from '@/images/laptop.jpg'
-import imageMeeting from '@/images/meeting.jpg'
-import imageWhiteboard from '@/images/whiteboard.jpg'
+import imageBuild from '@/images/build.png'
+import imageDeliver from '@/images/deliver.png'
+import imageDiscover from '@/images/discover.png'
 import { RootLayout } from '@/components/RootLayout'
 
 function Section({
@@ -56,27 +56,14 @@ function Section({
 
 function Discover() {
   return (
-    <Section title="Discover" image={{ src: imageWhiteboard }}>
+    <Section title="Discover" image={{ src: imageDiscover }}>
       <div className="space-y-6 text-base text-neutral-600">
         <p>
-          We work closely with our clients to understand their{' '}
-          <strong className="font-semibold text-neutral-950">needs</strong> and
-          goals, embedding ourselves in their every day operations to understand
-          what makes their business tick.
+          At FYHT4, discovery starts with the community. Every member is invited to submit project ideas that address needs in one of our focus areas:{" "}
+          <strong className="font-semibold text-neutral-950">education, health and well-being, or housing</strong>.
         </p>
         <p>
-          Our team of private investigators shadow the company director’s for
-          several weeks while our account managers focus on going through their
-          trash. Our senior security experts then perform social engineering
-          hacks to gain access to their{' '}
-          <strong className="font-semibold text-neutral-950">business</strong>{' '}
-          accounts — handing that information over to our forensic accounting
-          team.
-        </p>
-        <p>
-          Once the full audit is complete, we report back with a comprehensive{' '}
-          <strong className="font-semibold text-neutral-950">plan</strong> and,
-          more importantly, a budget.
+          If a project earns enough votes from neighbors in the submitter’s zip code, it advances to a wider approval stage—gathering votes across the local, state, or national level depending on the scope. Once a majority of affected areas vote yes, we move forward. No bureaucracy. Just action.
         </p>
       </div>
 
@@ -84,83 +71,56 @@ function Discover() {
         Included in this phase
       </h3>
       <TagList className="mt-4">
-        <TagListItem>In-depth questionnaires</TagListItem>
-        <TagListItem>Feasibility studies</TagListItem>
-        <TagListItem>Blood samples</TagListItem>
-        <TagListItem>Employee surveys</TagListItem>
-        <TagListItem>Proofs-of-concept</TagListItem>
-        <TagListItem>Forensic audit</TagListItem>
+        <TagListItem>Member-driven proposals</TagListItem>
+        <TagListItem>Zip code-level voting</TagListItem>
+        <TagListItem>Focus area alignment</TagListItem>
+        <TagListItem>Transparent approval process</TagListItem>
+        <TagListItem>Community impact tracking</TagListItem>
       </TagList>
     </Section>
-  )
+  );
 }
+
 
 function Build() {
   return (
-    <Section title="Build" image={{ src: imageLaptop, shape: 1 }}>
+    <Section title="Build" image={{ src: imageBuild, shape: 1 }}>
       <div className="space-y-6 text-base text-neutral-600">
         <p>
-          Based off of the discovery phase, we develop a comprehensive roadmap
-          for each product and start working towards delivery. The roadmap is an
-          intricately tangled mess of technical nonsense designed to drag the
-          project out as long as possible.
+          Once a project is approved through community voting, we move into action—building solutions that reflect the will and needs of the people. Each project is grounded in one of our core areas:{" "}
+          <strong className="font-semibold text-neutral-950">education, health and well-being, or housing</strong>.
         </p>
         <p>
-          Each client is assigned a key account manager to keep lines of
-          communication open and obscure the actual progress of the project.
-          They act as a buffer between the client’s incessant nagging and the
-          development team who are hard at work scouring open source projects
-          for code to re-purpose.
+          Local coordinators work directly with community members, partners, and contributors to ensure the project is delivered effectively and efficiently. Transparency and accountability are built into every step.
         </p>
         <p>
-          Our account managers are trained to only reply to client emails after
-          9pm, several days after the initial email. This reinforces the general
-          aura that we are very busy and dissuades clients from asking for
-          changes.
+          Because every approved project represents a collective choice, we prioritize communication, impact tracking, and progress updates—making sure every vote leads to visible change.
         </p>
       </div>
 
       <Blockquote
-        author={{ name: 'Debra Fiscal', role: 'CEO of Unseal' }}
+        author={{ name: 'Debra Fiscal', role: 'FYHT4 Participant' }}
         className="mt-12"
       >
-        Studio were so regular with their progress updates we almost began to
-        think they were automated!
+        “I never thought I’d see something like this actually happen in my town—until FYHT4 made it real.”
       </Blockquote>
     </Section>
-  )
+  );
 }
+
 
 function Deliver() {
   return (
-    <Section title="Deliver" image={{ src: imageMeeting, shape: 2 }}>
+    <Section title="Deliver" image={{ src: imageDeliver, shape: 2 }}>
       <div className="space-y-6 text-base text-neutral-600">
         <p>
-          About halfway through the Build phase, we push each project out by 6
-          weeks due to a change in{' '}
-          <strong className="font-semibold text-neutral-950">
-            requirements
-          </strong>
-          . This allows us to increase the budget a final time before launch.
+          When a project reaches the delivery phase, it's more than just a launch—it’s a milestone for the community. We ensure every build is completed with care, accountability, and local follow-through.
         </p>
         <p>
-          Despite largely using pre-built components, most of the{' '}
-          <strong className="font-semibold text-neutral-950">progress</strong>{' '}
-          on each project takes place in the final 24 hours. The development
-          time allocated to each client is actually spent making augmented
-          reality demos that go viral on social media.
+          Project leads coordinate with partners and community members to finalize implementation and handoff, making sure it’s not only functional but sustainable. We don’t just deliver projects—we deliver ownership and pride.
         </p>
         <p>
-          We ensure that the main pages of the site are{' '}
-          <strong className="font-semibold text-neutral-950">
-            fully functional
-          </strong>{' '}
-          at launch — the auxiliary pages will, of course, be lorem ipusm shells
-          which get updated as part of our exorbitant{' '}
-          <strong className="font-semibold text-neutral-950">
-            maintenance
-          </strong>{' '}
-          retainer.
+          From groundbreaking to grand opening, we stay present through the final steps, verifying quality, tracking outcomes, and supporting the people the project was built for.
         </p>
       </div>
 
@@ -168,21 +128,18 @@ function Deliver() {
         Included in this phase
       </h3>
       <List className="mt-8">
-        <ListItem title="Testing">
-          Our projects always have 100% test coverage, which would be impressive
-          if our tests weren’t as porous as a sieve.
+        <ListItem title="Quality Assurance">
+          Every project is reviewed for durability, impact, and adherence to community goals.
         </ListItem>
-        <ListItem title="Infrastructure">
-          To ensure reliability we only use the best Digital Ocean droplets that
-          $4 a month can buy.
+        <ListItem title="Community Training">
+          We empower local residents with the tools and knowledge to maintain what’s been built.
         </ListItem>
-        <ListItem title="Support">
-          Because we hold the API keys for every critical service your business
-          uses, you can expect a lifetime of support, and invoices, from us.
+        <ListItem title="Ongoing Support">
+          Our team remains engaged post-launch to monitor impact and provide continued guidance.
         </ListItem>
       </List>
     </Section>
-  )
+  );
 }
 
 function Values() {
@@ -196,49 +153,40 @@ function Values() {
       </div>
 
       <SectionIntro
-        eyebrow="Our values"
-        title="Balancing reliability and innovation"
+        eyebrow="Our Values"
+        title="Driven by people. Guided by purpose."
       >
         <p>
-          We strive to stay at the forefront of emerging trends and
-          technologies, while completely ignoring them and forking that old
-          Rails project we feel comfortable using. We stand by our core values
-          to justify that decision.
+          FYHT4 exists to prove that communities can solve their own problems when given the chance. We combine transparency, local input, and collective action to turn ideas into impact—without bureaucracy getting in the way.
         </p>
       </SectionIntro>
 
       <Container className="mt-24">
         <GridList>
-          <GridListItem title="Meticulous">
-            The first part of any partnership is getting our designer to put
-            your logo in our template. The second step is getting them to do the
-            colors.
+          <GridListItem title="Community-Led">
+            We believe the people closest to the issue are also closest to the solution. Every project starts with your voice.
           </GridListItem>
-          <GridListItem title="Efficient">
-            We pride ourselves on never missing a deadline which is easy because
-            most of the work was done years ago.
+          <GridListItem title="Transparent">
+            From voting to budgeting, every step is visible to contributors and residents alike—because trust is built through clarity.
           </GridListItem>
-          <GridListItem title="Adaptable">
-            Every business has unique needs and our greatest challenge is
-            shoe-horning those needs into something we already built.
+          <GridListItem title="Action-Oriented">
+            Once a project is approved, we get to work. No red tape. Just real change powered by real people.
           </GridListItem>
-          <GridListItem title="Honest">
-            We are transparent about all of our processes, banking on the simple
-            fact our clients never actually read anything.
+          <GridListItem title="Equitable">
+            Every zip code matters. Every vote counts. We build with, not for, the communities we serve.
           </GridListItem>
-          <GridListItem title="Loyal">
-            We foster long-term relationships with our clients that go beyond
-            just delivering a product, allowing us to invoice them for decades.
+          <GridListItem title="Accountable">
+            We track impact and invite communities to assess outcomes—not just once, but continuously.
           </GridListItem>
-          <GridListItem title="Innovative">
-            The technological landscape is always evolving and so are we. We are
-            constantly on the lookout for new open source projects to clone.
+          <GridListItem title="Sustainable">
+            Our work doesn’t stop at delivery. We empower communities to maintain and evolve the projects they helped create.
           </GridListItem>
         </GridList>
       </Container>
     </div>
-  )
+  );
 }
+
 
 export const metadata: Metadata = {
   title: 'Our Process',
@@ -251,9 +199,7 @@ export default function Process() {
     <RootLayout>
       <PageIntro eyebrow="Our process" title="How it works">
         <p>
-          We believe in efficiency and maximizing our resources to provide the
-          best value to our clients. The primary way we do that is by re-using
-          the same five projects we’ve been developing for the past decade.
+          FYHT4 empowers people to contribute in the areas of education, health and well-being, or housing. Every contributor receives a vote on projects in their selected category and location, and once a majority of relevant zip codes approve, the project moves forward—no bureaucracy, just action.
         </p>
       </PageIntro>
 

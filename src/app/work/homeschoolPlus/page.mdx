@@ -1,0 +1,56 @@
+import logo from '@/images/clients/homeschool/homeschoolLogo.png'
+import imageHero from './homeschool.png'
+import imageEmilySelman from './emily-selman.jpg'
+
+export const caseStudy = {
+  client: 'Homeschool Plus',
+  title: 'Reimagining Education Through Community',
+  description:
+    'Homeschool Plus empowers families to take control of their child’s education by offering an alternative to traditional schooling—one that’s built around curiosity, flexibility, and community values. We believe education should be a partnership, not a prescription.',
+  summary: [
+    'Homeschool Plus supports families through flexible, community-based learning programs focused on education, health and well-being, and life skills. Parents can customize their child’s learning path while remaining connected to local peers and resources.',
+    'We built an accessible platform that allows parents to enroll, track progress, contribute ideas, and vote on shared educational projects. Whether it’s Taekwondo for behavioral growth or integrated STEM projects, every activity is grounded in choice and connection.',
+  ],
+  logo,
+  image: { src: imageHero },
+  date: '2022-10',
+  service: 'Alternative Education & Community Learning',
+  testimonial: {
+    author: { name: 'Robert Von Der Becke', role: 'Founder, Homeschool Plus' },
+    content:
+      'Homeschool Plus has given families the power to educate with intention. We’ve created something that lets parents shape a learning environment rooted in respect, responsibility, and readiness for life. The community response has been incredible.',
+  },
+}
+
+export const metadata = {
+  title: `${caseStudy.client} Case Study`,
+  description: caseStudy.description,
+}
+
+## Overview
+
+Homeschool Plus provides a fresh take on learning by giving families the ability to shape how, when, and where their children learn. We remove bureaucracy from education by combining freedom of choice with community input. Whether parents want to emphasize Taekwondo, project-based learning, or mental wellness, they can propose programs, gather support, and vote within their local and regional circles.
+
+By making decision-making local and shared, Homeschool Plus ensures each child’s learning path reflects both family values and collective insight.
+
+## What we did
+
+<TagList>
+  <TagListItem>Flexible Learning Paths</TagListItem>
+  <TagListItem>Community-Driven Projects</TagListItem>
+  <TagListItem>Accessible for All Families</TagListItem>
+</TagList>
+
+<Blockquote
+  author={{ name: 'Ryann Von Der Becke', role: 'Vice President' }}
+  image={{ src: imageEmilySelman }}
+>
+  Homeschool Plus isn’t just a platform—it’s a movement. We’ve built a system that allows families to educate in ways that reflect their values, culture, and community. Every family, every vote, and every child counts.
+</Blockquote>
+
+<StatList>
+  <StatListItem value="85%" label="Parent satisfaction rate" />
+  <StatListItem value="12+" label="Community-driven learning hubs" />
+  <StatListItem value="3x" label="Growth in regional participation" />
+  <StatListItem value="0" label="Barriers to entry" />
+</StatList>
