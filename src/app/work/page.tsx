@@ -144,7 +144,7 @@ export default async function Work() {
         title="Proven solutions for real-world problems."
       >
         <p>
-          We believe in practical, resourceful approaches that maximize impact. By refining and adapting a core set of community-driven programs, we deliver consistent, high-value support where it’s needed most.
+          We believe in practical, resourceful approaches that maximize impact. By refining and adapting a core set of community-driven programs, we deliver consistent, high-value support where it&apos;s needed most.
         </p>
       </PageIntro>
 
