@@ -102,6 +102,9 @@ export async function POST(req: Request) {
   if (await alreadyProcessed(db, event.id)) {
     return NextResponse.json({ received: true, idempotent: true })
   }
+type InvoiceWithSub = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null
+}
 
   try {
     switch (event.type) {
@@ -156,51 +159,57 @@ export async function POST(req: Request) {
        * Subscription invoices (initial & renewals).
        * This is the canonical place to count subscription money.
        */
-      case 'invoice.paid': {
-        const invoice = event.data.object as Stripe.Invoice
-        const amount = invoice.amount_paid ?? 0 // cents
-        if (amount <= 0) break
+     case 'invoice.paid': {
+  const invoice = event.data.object as InvoiceWithSub
+  const amount = invoice.amount_paid ?? 0 // cents
+  if (amount <= 0) break
 
-        const currency = invoice.currency || 'usd'
-        const email = invoice.customer_email || null
-        const invoiceId = invoice.id
-        const subscriptionId = (invoice.subscription as string) || undefined
+  const currency = invoice.currency || 'usd'
+  const email = invoice.customer_email || null
+  const invoiceId = invoice.id
 
-        // campaign from subscription metadata (set during Checkout)
-        let campaign = invoice.metadata?.campaign || ''
-        if (!campaign && subscriptionId) {
-          try {
-            const sub = await stripe.subscriptions.retrieve(subscriptionId)
-            campaign = sub.metadata?.campaign || ''
-          } catch (e) {
-            console.warn('Could not fetch subscription metadata for', subscriptionId)
-          }
-        }
-        const projectId = asObjectId((campaign || '').trim())
+  // TS-safe extraction (works if subscription is string or expanded object)
+  const subscriptionId =
+    typeof invoice.subscription === 'string'
+      ? invoice.subscription
+      : invoice.subscription?.id
 
-        // Match user by email (optional)
-        let userId: ObjectId | undefined
-        if (email) {
-          const user = await db.collection('users').findOne({ email }, { projection: { _id: 1 } })
-          if (user?._id) userId = new ObjectId(user._id)
-        }
+  // campaign from invoice or subscription metadata
+  let campaign = invoice.metadata?.campaign || ''
+  if (!campaign && subscriptionId) {
+    try {
+      const sub = await stripe.subscriptions.retrieve(subscriptionId)
+      campaign = sub.metadata?.campaign || ''
+    } catch {
+      console.warn('Could not fetch subscription metadata for', subscriptionId)
+    }
+  }
+  const projectId = asObjectId((campaign || '').trim())
 
-        await recordDonation({
-          db,
-          externalId: invoiceId,         // idempotent on invoice id
-          kind: 'subscription',
-          amount,
-          currency,
-          email,
-          userId,
-          projectId,
-          subscriptionId,
-          invoiceId,
-          occurredAt: new Date(invoice.created * 1000),
-        })
+  // (optional) match user by email
+  let userId: ObjectId | undefined
+  if (email) {
+    const user = await db.collection('users').findOne({ email }, { projection: { _id: 1 } })
+    if (user?._id) userId = new ObjectId(user._id)
+  }
 
-        break
-      }
+  await recordDonation({
+    db,
+    externalId: invoiceId ?? '', // ensure string
+    kind: 'subscription',
+    amount,
+    currency,
+    email,
+    userId,
+    projectId,
+    subscriptionId,              // string | undefined OK (param is optional)
+    invoiceId,                   // string
+    occurredAt: new Date(invoice.created * 1000),
+  })
+
+  break
+}
+
 
       // Optional: If you ever skip Checkout and take direct payments:
       case 'payment_intent.succeeded': {
@@ -224,6 +233,7 @@ case 'charge.refunded': {
   // You may also insert a negative "adjustment" donation record if you want a full audit trail
   break
 }
+
 
       default:
         // Unhandled events are normal; just log.
