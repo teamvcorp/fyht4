@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession, signIn, signOut, SessionProvider } from 'next-auth/react' // ⬅️ added
 import clsx from 'clsx'
@@ -44,6 +45,117 @@ function MenuIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
     </svg>
   )
 }
+function HeaderMenu({ invert = false }: { invert?: boolean }) {
+  const { data: session } = useSession()
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      const t = e.target as Node
+      if (panelRef.current?.contains(t) || btnRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [])
+
+  const buttonCls = clsx(
+    'rounded-2xl px-4 py-2 text-sm font-semibold transition',
+    invert
+      ? 'border border-white/30 text-white hover:border-white/50'
+      : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
+  )
+
+  const panelCls = clsx(
+    'absolute right-0 z-50 mt-2 w-56 rounded-2xl border shadow-lg ring-1',
+    invert
+      ? 'bg-neutral-900 text-white border-white/10 ring-white/10'
+      : 'bg-white text-neutral-900 border-neutral-200 ring-black/5'
+  )
+
+  const itemCls = clsx(
+    'block w-full text-left rounded-xl px-3 py-2 text-sm',
+    invert ? 'hover:bg-white/10' : 'hover:bg-neutral-100'
+  )
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open ? 'true' : 'false'}
+        className={buttonCls}
+      >
+        {session?.user?.image ? (
+          <Image
+        src={session.user.image}
+        alt="Profile"
+        width={24}
+        height={24} 
+        className="inline-block h-6 w-6 rounded-full mr-2 align-middle"
+          />
+        ) : null}
+        {session?.user?.name ? session.user.name.split(' ')[0] : 'Menu'}
+        <span className="ml-1 select-none">▾</span>
+      </button>
+
+      {open && (
+        <div ref={panelRef} role="menu" className={panelCls}>
+          <div className="p-2">
+            <Link href="/projects" className={itemCls} role="menuitem">
+              Projects
+            </Link>
+
+            {session?.user && (
+              <Link href="/dashboard" className={itemCls} role="menuitem">
+                Dashboard
+              </Link>
+            )}
+
+            {session?.user ? (
+              <>
+                <Link
+                  href="/settings/connections"
+                  className={itemCls}
+                  role="menuitem"
+                >
+                  Settings
+                </Link>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/' })}
+                  className={itemCls}
+                  role="menuitem"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link href="/membership" className={itemCls} role="menuitem">
+                Sign In / Up
+              </Link>
+            )}
+
+            <Link href="/contact" className={itemCls} role="menuitem">
+              Contact us
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 
 function Header({
   panelId,
@@ -78,64 +190,30 @@ function Header({
             filled={logoHovered}
           />
         </Link>
-        <div className="flex items-center gap-x-8">
-          {/* ⬇️ show Settings + Sign out only when signed in */}
-          {session?.user && (
-            <>
-              <Button href="/settings/connections" invert={invert}>
-                Settings
-              </Button>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className={clsx(
-                  'rounded-2xl px-4 py-2 text-sm font-semibold transition',
-                  invert
-                    ? 'border border-white/30 text-white hover:border-white/50'
-                    : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
-                )}
-              >
-                Sign out
-              </button>
-            </>
-          )}
-          {!session?.user && (
-            <Button
-              href="/membership" // ⬅️ dummy href to make it behave like a lin flow
-              className={clsx(
-                'rounded-2xl px-4 py-2 text-sm font-semibold transition',
-                invert
-                  ? 'border border-white/30 text-white hover:border-white/50'
-                  : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
-              )}
-            >
-              Sign In / Up
-            </Button>
-          )}
-          <Button href="/contact" invert={invert}>
-            Contact us
-          </Button>
-          <button
-            ref={toggleRef}
-            type="button"
-            onClick={onToggle}
-            aria-expanded={expanded ? 'true' : 'false'}
-            aria-controls={panelId}
-            className={clsx(
-              'group -m-2.5 rounded-full p-2.5 transition',
-              invert ? 'hover:bg-white/10' : 'hover:bg-neutral-950/10',
-            )}
-            aria-label="Toggle navigation"
-          >
-            <Icon
-              className={clsx(
-                'h-6 w-6',
-                invert
-                  ? 'fill-white group-hover:fill-neutral-200'
-                  : 'fill-neutral-950 group-hover:fill-neutral-700',
-              )}
-            />
-          </button>
-        </div>
+<div className="flex items-center gap-x-8">
+  <HeaderMenu invert={invert} />
+  <button
+    ref={toggleRef}
+    type="button"
+    onClick={onToggle}
+    aria-expanded={expanded ? 'true' : 'false'}
+    aria-controls={panelId}
+    className={clsx(
+      'group -m-2.5 rounded-full p-2.5 transition',
+      invert ? 'hover:bg-white/10' : 'hover:bg-neutral-950/10',
+    )}
+    aria-label="Toggle navigation"
+  >
+    <Icon
+      className={clsx(
+        'h-6 w-6',
+        invert
+          ? 'fill-white group-hover:fill-neutral-200'
+          : 'fill-neutral-950 group-hover:fill-neutral-700',
+      )}
+    />
+  </button>
+</div>
       </div>
     </Container>
   )
