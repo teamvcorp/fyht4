@@ -10,6 +10,7 @@ import {
 } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signIn, signOut, SessionProvider } from 'next-auth/react' // ⬅️ added
 import clsx from 'clsx'
 import { motion, MotionConfig, useReducedMotion } from 'framer-motion'
 
@@ -17,9 +18,10 @@ import { Button } from '@/components/Button'
 import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { GridPattern } from '@/components/GridPattern'
-import { Logo} from '@/components/Logo'
+import { Logo } from '@/components/Logo'
 import { Offices } from '@/components/Offices'
 import { SocialMedia } from '@/components/SocialMedia'
+import { Session } from 'inspector'
 
 const RootLayoutContext = createContext<{
   logoHovered: boolean
@@ -58,7 +60,8 @@ function Header({
   toggleRef: React.RefObject<HTMLButtonElement>
   invert?: boolean
 }) {
-  let { logoHovered, setLogoHovered } = useContext(RootLayoutContext)!
+  const { logoHovered, setLogoHovered } = useContext(RootLayoutContext)!
+  const { data: session } = useSession() // ⬅️ read auth state
 
   return (
     <Container>
@@ -69,7 +72,6 @@ function Header({
           onMouseEnter={() => setLogoHovered(true)}
           onMouseLeave={() => setLogoHovered(false)}
         >
-        
           <Logo
             className="hidden h-8 sm:block"
             invert={invert}
@@ -77,6 +79,38 @@ function Header({
           />
         </Link>
         <div className="flex items-center gap-x-8">
+          {/* ⬇️ show Settings + Sign out only when signed in */}
+          {session?.user && (
+            <>
+              <Button href="/settings/connections" invert={invert}>
+                Settings
+              </Button>
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className={clsx(
+                  'rounded-2xl px-4 py-2 text-sm font-semibold transition',
+                  invert
+                    ? 'border border-white/30 text-white hover:border-white/50'
+                    : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
+                )}
+              >
+                Sign out
+              </button>
+            </>
+          )}
+          {!session?.user && (
+            <button
+              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+              className={clsx(
+                'rounded-2xl px-4 py-2 text-sm font-semibold transition',
+                invert
+                  ? 'border border-white/30 text-white hover:border-white/50'
+                  : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
+              )}
+            >
+              Sign in
+            </button>
+          )}
           <Button href="/contact" invert={invert}>
             Contact us
           </Button>
@@ -151,13 +185,13 @@ function Navigation() {
 }
 
 function RootLayoutInner({ children }: { children: React.ReactNode }) {
-  let panelId = useId()
-  let [expanded, setExpanded] = useState(false)
-  let [isTransitioning, setIsTransitioning] = useState(false)
-  let openRef = useRef<React.ElementRef<'button'>>(null)
-  let closeRef = useRef<React.ElementRef<'button'>>(null)
-  let navRef = useRef<React.ElementRef<'div'>>(null)
-  let shouldReduceMotion = useReducedMotion()
+  const panelId = useId()
+  const [expanded, setExpanded] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const openRef = useRef<React.ElementRef<'button'>>(null)
+  const closeRef = useRef<React.ElementRef<'button'>>(null)
+  const navRef = useRef<React.ElementRef<'div'>>(null)
+  const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -169,9 +203,7 @@ function RootLayoutInner({ children }: { children: React.ReactNode }) {
         setExpanded(false)
       }
     }
-
     window.addEventListener('click', onClick)
-
     return () => {
       window.removeEventListener('click', onClick)
     }
@@ -197,7 +229,7 @@ function RootLayoutInner({ children }: { children: React.ReactNode }) {
             expanded={expanded}
             onToggle={() => {
               setIsTransitioning(true)
-              setExpanded((expanded) => !expanded)
+              setExpanded((e) => !e)
               window.setTimeout(() =>
                 closeRef.current?.focus({ preventScroll: true }),
               )
@@ -224,7 +256,7 @@ function RootLayoutInner({ children }: { children: React.ReactNode }) {
                 expanded={expanded}
                 onToggle={() => {
                   setIsTransitioning(true)
-                  setExpanded((expanded) => !expanded)
+                  setExpanded((e) => !e)
                   window.setTimeout(() =>
                     openRef.current?.focus({ preventScroll: true }),
                   )
@@ -282,12 +314,14 @@ function RootLayoutInner({ children }: { children: React.ReactNode }) {
 }
 
 export function RootLayout({ children }: { children: React.ReactNode }) {
-  let pathname = usePathname()
-  let [logoHovered, setLogoHovered] = useState(false)
+  const pathname = usePathname()
+  const [logoHovered, setLogoHovered] = useState(false)
 
   return (
-    <RootLayoutContext.Provider value={{ logoHovered, setLogoHovered }}>
-      <RootLayoutInner key={pathname}>{children}</RootLayoutInner>
-    </RootLayoutContext.Provider>
+    <SessionProvider>
+      <RootLayoutContext.Provider value={{ logoHovered, setLogoHovered }}>
+        <RootLayoutInner key={pathname}>{children}</RootLayoutInner>
+      </RootLayoutContext.Provider>
+    </SessionProvider>
   )
 }

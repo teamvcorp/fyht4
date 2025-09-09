@@ -25,31 +25,30 @@ import imageWhitneyFrancis from '@/images/team/whitney-francis.jpg'
 import { loadArticles } from '@/lib/mdx'
 import { RootLayout } from '@/components/RootLayout'
 
-function Culture() {
+function Culture() { 
   return (
     <div className="mt-24 rounded-4xl bg-neutral-950 py-24 sm:mt-32 lg:mt-40 lg:py-32">
       <SectionIntro
         eyebrow="Our culture"
-        title="Balance your passion with your passion for life."
+        title="Balance your passion with your purpose."
         invert
       >
         <p>
-          We are a group of like-minded people who share the same core values.
+          we are united by a shared commitment to creating change and supporting the communities we serve.
         </p>
       </SectionIntro>
       <Container className="mt-16">
         <GridList>
           <GridListItem title="Loyalty" invert>
-            Our team has been with us since the beginning because none of them
-            are allowed to have LinkedIn profiles.
+            We stand by one another and by the people we fight for, 
+            building trust through action and accountability.
           </GridListItem>
           <GridListItem title="Trust" invert>
-            We don’t care when our team works just as long as they are working
-            every waking second.
+            We believe in transparency and collaboration, 
+            creating space for honesty and shared responsibility.
           </GridListItem>
           <GridListItem title="Compassion" invert>
-            You never know what someone is going through at home and we make
-            sure to never find out.
+            We lead with empathy, recognizing that every person’s story and struggle matters.
           </GridListItem>
         </GridList>
       </Container>
@@ -182,7 +181,7 @@ function Team() {
 export const metadata: Metadata = {
   title: 'About Us',
   description:
-    'We believe that our strength lies in our collaborative approach, which puts our clients at the center of everything we do.',
+    'Fyght4 believes in the power of collective action, amplifying voices, and building solidarity to create meaningful pathways for dignity and opportunity.',
 }
 
 export default async function About() {
@@ -190,31 +189,29 @@ export default async function About() {
 
   return (
     <RootLayout>
-      <PageIntro eyebrow="About us" title="Our strength is collaboration">
+      <PageIntro eyebrow="About us" title="Our strength is community">
         <p>
-          We believe that our strength lies in our collaborative approach, which
-          puts our clients at the center of everything we do.
+          We are deidicated to amplifying voices, building solidarity, and creating meaningful pathways for fairness and inclusion.
         </p>
         <div className="mt-10 max-w-2xl space-y-6 text-base">
           <p>
-            Studio was started by three friends who noticed that developer
-            studios were charging clients double what an in-house team would
-            cost. Since the beginning, we have been committed to doing things
-            differently by charging triple instead.
+            What began as a small group of people determined to challenge the status quo has grown into a movement that connects 
+            communities, organizations, and individuals who share the same vision: a fairer, more compassionate world.
+
+            At Fyght4, we believe in transparency, collaboration, and action. Every project we take on is rooted in listening to those 
+            most affected and working side by side to create solutions that matter.
           </p>
           <p>
-            At Studio, we’re more than just colleagues — we’re a family. This
-            means we pay very little and expect people to work late. We want our
-            employees to bring their whole selves to work. In return, we just
-            ask that they keep themselves there until at least 6:30pm.
+            At Fyght4, we stand for empowering communities through education and advocacy, building networks that strengthen resilience 
+            and solidarity, and driving change with creativity, persistence, and compassion.
           </p>
         </div>
       </PageIntro>
       <Container className="mt-16">
         <StatList>
-          <StatListItem value="35" label="Underpaid employees" />
-          <StatListItem value="52" label="Placated clients" />
-          <StatListItem value="$25M" label="Invoices billed" />
+          <StatListItem value="35+" label="Community Partners" />
+          <StatListItem value="50+" label="Campains Launched" />
+          <StatListItem value="Thousands & Growing" label="People Reached" />
         </StatList>
       </Container>
 
@@ -225,7 +222,7 @@ export default async function About() {
       <PageLinks
         className="mt-24 sm:mt-32 lg:mt-40"
         title="From the blog"
-        intro="Our team of experienced designers and developers has just one thing on their mind; working on your ideas to draw a smile on the face of your users worldwide. From conducting Brand Sprints to UX Design."
+        intro="Our team is dedicated to sharing stories, insights, and strategies that inspire action and strengthen communities. From highlighting local movements to exploring creative approaches to advocacy, our blog is a space to learn, connect, and spark change."
         pages={blogArticles}
       />
 

@@ -4,6 +4,9 @@ import { Container } from '@/components/Container'
 import { FadeIn } from '@/components/FadeIn'
 import { PageIntro } from '@/components/PageIntro'
 import MembershipActions from '@/components/membership/MembershipActions'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Membership',
@@ -11,7 +14,11 @@ export const metadata: Metadata = {
     'Join FYHT4 as a member to propose projects, vote by ZIP code, and receive transparent updates.',
 }
 
-export default function MembershipPage() {
+export default async function MembershipPage() {
+  const session = await getServerSession(authOptions)
+  if (session) {
+    redirect('/dashboard')
+  }
   return (
     <RootLayout>
       <PageIntro eyebrow="Membership" title="Join the movement. Shape what gets built.">

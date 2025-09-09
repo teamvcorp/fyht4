@@ -1,48 +1,29 @@
+// src/app/membership/MembershipActions.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 
 export default function MembershipActions() {
   const [email, setEmail] = useState('')
   const [newsletter, setNewsletter] = useState(true)
   const [loading, setLoading] = useState<'google' | 'email' | null>(null)
+  const callbackUrl = '/membership/welcome'
+  const searchParams = useSearchParams()
+  const authError = searchParams.get('error')
 
-  const callbackUrl = '/membership/welcome' // change to your dashboard if you like
-
-  async function handleGoogle() {
-    try {
-      setLoading('google')
-      // optional: pre-subscribe email if present and newsletter checked
-      if (newsletter && email && validateEmail(email)) {
-        await subscribeNewsletter(email)
+  const niceError = useMemo(() => {
+    if (authError === 'OAuthAccountNotLinked') {
+      return {
+        title: 'This email is already registered',
+        body:
+          'Sign in with your original method (e.g., Email link). Once signed in, open Settings → Connections to link Google.',
       }
-      await signIn('google', { callbackUrl })
-    } finally {
-      setLoading(null)
     }
-  }
-
-  async function handleEmail() {
-    try {
-      if (!validateEmail(email)) {
-        alert('Please enter a valid email.')
-        return
-      }
-      setLoading('email')
-
-      // Newsletter opt-in before sign-in (best-effort)
-      if (newsletter) {
-        await subscribeNewsletter(email)
-      }
-
-      // Triggers NextAuth Email provider (Resend will send the magic link)
-      await signIn('email', { email, callbackUrl })
-      alert('Check your email for a secure sign-in link.')
-    } finally {
-      setLoading(null)
-    }
-  }
+    return null
+  }, [authError])
 
   async function subscribeNewsletter(addr: string) {
     const res = await fetch('/api/newsletter/subscribe', {
@@ -50,17 +31,45 @@ export default function MembershipActions() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: addr }),
     })
-    // non-blocking: ignore non-2xx
     return res.ok
   }
+  const validateEmail = (v: string) => /\S+@\S+\.\S+/.test(v)
 
-  function validateEmail(v: string) {
-    return /\S+@\S+\.\S+/.test(v)
+  async function handleGoogle() {
+    try {
+      setLoading('google')
+      if (newsletter && email && validateEmail(email)) await subscribeNewsletter(email)
+      await signIn('google', { callbackUrl })
+    } finally { setLoading(null) }
+  }
+
+  async function handleEmail() {
+    try {
+      if (!validateEmail(email)) return alert('Please enter a valid email.')
+      setLoading('email')
+      if (newsletter) await subscribeNewsletter(email)
+      await signIn('email', { email, callbackUrl })
+      alert('Check your email for a secure sign-in link.')
+    } finally { setLoading(null) }
   }
 
   return (
     <div className="mt-8 mx-auto max-w-xl">
-      {/* Google sign-in */}
+      {niceError && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-semibold">{niceError.title}</p>
+          <p className="mt-1 text-sm">{niceError.body}</p>
+          <div className="mt-2">
+            <Link
+              href="/settings/connections"
+              className="inline-block rounded-xl border border-amber-300 px-3 py-1.5 text-sm font-semibold hover:border-amber-400"
+            >
+              Go to Settings → Connections
+            </Link>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={handleGoogle}
         disabled={loading === 'google'}
@@ -69,24 +78,19 @@ export default function MembershipActions() {
         {loading === 'google' ? 'Connecting to Google…' : 'Continue with Google'}
       </button>
 
-      {/* Divider */}
       <div className="my-6 flex items-center justify-center gap-3 text-neutral-500">
         <span className="h-px w-16 bg-neutral-200" />
         <span className="text-sm">or</span>
         <span className="h-px w-16 bg-neutral-200" />
       </div>
 
-      {/* Email sign-in */}
       <label htmlFor="email" className="block text-sm font-medium text-neutral-800">
         Email address
       </label>
       <div className="mt-1 flex gap-2">
         <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          id="email" type="email" autoComplete="email"
+          value={email} onChange={(e) => setEmail(e.target.value)}
           className="flex-1 rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-neutral-500"
           placeholder="you@example.com"
         />
@@ -99,7 +103,6 @@ export default function MembershipActions() {
         </button>
       </div>
 
-      {/* Newsletter opt-in */}
       <label className="mt-4 flex items-start gap-3 text-sm text-neutral-700">
         <input
           type="checkbox"
@@ -110,9 +113,17 @@ export default function MembershipActions() {
         Subscribe me to FYHT4 updates and impact briefs
       </label>
 
-      {/* Fine print */}
       <p className="mt-4 text-xs text-neutral-500">
         By continuing, you agree to our Terms and acknowledge our Privacy Policy.
+      </p>
+
+      {/* Always-visible helper for signed-in users */}
+      <p className="mt-6 text-sm text-neutral-600">
+        Already signed in?{' '}
+        <Link href="/settings/connections" className="underline hover:text-neutral-800">
+          Manage your connected accounts
+        </Link>
+        .
       </p>
     </div>
   )

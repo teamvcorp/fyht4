@@ -5,17 +5,25 @@ import Stripe from 'stripe'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, { apiVersion: '2025-08-27.basil' })
+// (You can omit apiVersion to use Stripe's default, or ensure this string is valid)
+const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+})
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
+
     const frequency = (searchParams.get('frequency') || 'once').toLowerCase()
     const isMonthly = frequency === 'monthly'
     const amount = Math.round(Number(searchParams.get('amount') || '0') * 100)
     if (!Number.isFinite(amount) || amount < 100) {
       return NextResponse.json({ error: 'Invalid amount. Minimum is $1.' }, { status: 400 })
     }
+
+    // ★ ADDED: campaign + optional email
+    const campaign = (searchParams.get('campaign') || '').trim()
+    const email = searchParams.get('email') || undefined
 
     const url = new URL(req.url)
     const origin = req.headers.get('origin') || `${url.protocol}//${url.host}`
@@ -42,11 +50,24 @@ export async function GET(req: NextRequest) {
       cancel_url,
       billing_address_collection: 'auto',
       ...(isMonthly ? {} : { submit_type: 'donate' }),
+      // ★ ADDED: session-level metadata (helps attribute one-time donations)
+      metadata: { campaign, source: 'donate_page' },
+      // ★ ADDED: optional prefill email (nice DX but not required)
+      ...(email ? { customer_email: email } : {}),
     }
 
-    // ⬇️ ONLY pass the 2nd arg if you actually have options (e.g., stripeAccount)
+    // ★ ADDED: for subscriptions, also set subscription_data.metadata
+    if (isMonthly) {
+      ;(params as any).subscription_data = {
+        metadata: { campaign },
+      }
+    }
+
+    // ONLY pass options if using Connect (you said you're not)
     const connectAccountId = searchParams.get('connectAccountId') || undefined
-    const options = connectAccountId ? ({ stripeAccount: connectAccountId } as Stripe.RequestOptions) : undefined
+    const options = connectAccountId
+      ? ({ stripeAccount: connectAccountId } as Stripe.RequestOptions)
+      : undefined
 
     const session = options
       ? await stripe.checkout.sessions.create(params, options)
