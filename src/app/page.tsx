@@ -14,7 +14,6 @@ import TKDColorLogo from '@/images/clients/Taekwondo/taekwondoLogo.png'
 import SantaLogo from '@/images/clients/santa/santaLogo.png'
 import CRFCLogo from '@/images/clients/crossroad/crossroadLogo.png'
 import Fyht4LogoLite from '@/images/clients/fight/fightLogo.png'
-import HomeSchoolLogo from '@/images/clients/homeschool/homeschoolLogo.png'
 import imageFam from '@/images/fam.png'
 import { type CaseStudy, type MDXEntry, loadCaseStudies } from '@/lib/mdx'
 import { RootLayout } from '@/components/RootLayout'
@@ -25,7 +24,6 @@ const clients = [
   ['Santa', SantaLogo],
   ['CRFC', CRFCLogo],
   ['FYHT4', Fyht4LogoLite],
-  ['Homeschool', HomeSchoolLogo],
 
 ]
 
@@ -220,12 +218,7 @@ export default async function Home() {
 
       <CaseStudies caseStudies={caseStudies} />
 
-      <Testimonial
-        className="mt-24 sm:mt-32 lg:mt-40"
-        client={{ name: 'tkd', logo: TKDColorLogo }}
-      >
-        TeamVCorp is fully commited to social change leading they way with programs that educate and guide postive behaviors and actions. Their work is a testament to the power of community and the impact of collective effort. We are proud to be part of this movement.
-      </Testimonial>
+   
 
       <Services />
 

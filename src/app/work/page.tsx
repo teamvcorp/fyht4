@@ -150,14 +150,7 @@ export default async function Work() {
 
       <CaseStudies caseStudies={caseStudies} />
 
-      <Testimonial
-        className="mt-24 sm:mt-32 lg:mt-40"
-        client={{ name: 'Brightland', logo: brightlandLogo}}
-      >
-        We approached <em>Studio</em> because we loved their past work. They
-        delivered something remarkably similar in record time.
-      </Testimonial>
-
+  
       <Clients />
 
       <ContactSection />
