@@ -46,9 +46,27 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  callbacks: {
-    async session({ session, token }) {
-      if (token?.sub) (session.user as any).id = token.sub
+ callbacks: {
+    async jwt({ token, user }) {
+      // ensure the id is always on the token (for JWT sessions)
+      if (user) {
+        // NextAuth sets token.sub to user id already; keep an explicit id too
+        (token as any).id = (user as any).id ?? token.sub
+      }
+      return token
+    },
+    async session({ session, token, user }) {
+      // Works for both strategies:
+      // - JWT: read from token.id or token.sub
+      // - Database: read from user.id
+      const id =
+        (token as any)?.id ??
+        token?.sub ??
+        (user as any)?.id
+
+      if (session.user && id) {
+        (session.user as any).id = id
+      }
       return session
     },
   },

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { type Metadata } from 'next'
 import { ObjectId } from 'mongodb'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import clientPromise from '@/lib/mongodb'
 
 import { RootLayout } from '@/components/RootLayout'
