@@ -70,7 +70,7 @@ function CaseStudies({
                       href={caseStudy.href}
                       aria-label={`Read case study: ${caseStudy.client}`}
                     >
-                      Read case study
+                      Read More
                     </Button>
                   </div>
                   {caseStudy.testimonial && (

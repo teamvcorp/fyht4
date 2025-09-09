@@ -26,7 +26,7 @@ const clients = [
   ['CRFC', CRFCLogo],
   ['FYHT4', Fyht4LogoLite],
   ['Homeschool', HomeSchoolLogo],
- 
+
 ]
 
 function Clients() {
@@ -48,10 +48,10 @@ function Clients() {
               <li key={String(client)}>
                 <FadeIn>
                   <Image
-                  src={logo}
-                  alt={typeof client === 'string' ? client : ''}
-                  unoptimized
-                  className="max-w-[100px] max-h-[100px]"
+                    src={logo}
+                    alt={typeof client === 'string' ? client : ''}
+                    unoptimized
+                    className="max-w-[100px] max-h-[100px]"
                   />
                 </FadeIn>
               </li>
@@ -189,17 +189,34 @@ export default async function Home() {
   return (
     <RootLayout>
       <Container className="mt-24 sm:mt-32 md:mt-56">
-        <FadeIn className="max-w-3xl">
-          <h1 className="font-display text-5xl font-medium tracking-tight text-balance text-neutral-950 sm:text-7xl">
-            Effortonomy, where human rights meets direct action.
+        <FadeIn className="max-w-3xl text-center mx-auto">
+          <h1 className="font-display text-5xl font-bold tracking-tight text-neutral-950 sm:text-7xl">
+            Fight 4 Change: A World Where Effort Unlocks Opportunity
           </h1>
-          <p className="mt-6 text-xl text-neutral-600">
-            Put your voice and your resources to work for you.  We are building a society that rewards people based on effort, no credit checks, no complex approvals, just a world where eveyone has equal access to shelter, food, healthcare, and education.If you want to be heard and have a fair shot, join us in the fight for Effortonomy.
+          <p className="mt-6 text-xl text-neutral-600 leading-relaxed">
+            Join us in building a future where shelter, food, healthcare, and education
+            aren’t privileges—they’re rights. No credit checks. No red tape.
+            Just fairness, dignity, and action. Your effort—and your support—make it possible.
           </p>
+          <div className="mt-8 flex justify-center gap-4">
+            <a
+              href="/donate"
+              className="rounded-2xl bg-emerald-600 px-6 py-3 text-lg font-semibold text-white shadow-lg hover:bg-emerald-700 transition"
+            >
+              Donate Now
+            </a>
+            <a
+              href="/process"
+              className="rounded-2xl border border-neutral-300 px-6 py-3 text-lg font-semibold text-neutral-700 hover:border-neutral-500 transition"
+            >
+              See How It Works
+            </a>
+          </div>
         </FadeIn>
       </Container>
 
-      <Clients />
+
+
 
       <CaseStudies caseStudies={caseStudies} />
 
