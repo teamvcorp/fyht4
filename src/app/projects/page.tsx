@@ -3,16 +3,15 @@ import { type Metadata } from 'next'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import clientPromise from '@/lib/mongodb'
-import { ObjectId, type Filter, type Sort } from 'mongodb'
+import { type Filter, type Sort, ObjectId } from 'mongodb'
 import { serializeDocs } from '@/lib/serializers'
 
 import { RootLayout } from '@/components/RootLayout'
 import { Container } from '@/components/Container'
 import { FadeIn } from '@/components/FadeIn'
 import { PageIntro } from '@/components/PageIntro'
-import WatchButton from '@/components/projects/WatchButton'
-
 import ProjectsToolbar from '@/components/projects/ProjectsToolbar'
+import WatchButton from '@/components/projects/WatchButton'
 import VoteButtons from '@/components/projects/VoteButtons'
 import DonateNowButton from '@/components/projects/DonateNowButton'
 
@@ -46,18 +45,22 @@ export const dynamic = 'force-dynamic'
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; q?: string }
+  // ✅ Next.js 15 passes searchParams as a Promise
+  searchParams: Promise<{ sort?: string | string[]; q?: string | string[] }>
 }) {
+  const { sort: sortParam, q: qParam } = await searchParams
+  const sortRaw = Array.isArray(sortParam) ? sortParam[0] : sortParam
+  const qRaw = Array.isArray(qParam) ? qParam[0] : qParam
+
+  const sortBy = (sortRaw || 'latest').toLowerCase()
+  const q = (qRaw || '').trim()
+
   const session = await getServerSession(authOptions)
   const db = (await clientPromise).db()
   const projectsCol = db.collection<Project>('projects')
 
-  const sortBy = (searchParams.sort || 'latest').toLowerCase()
-  const q = (searchParams.q || '').trim()
-
   const filter: Filter<Project> = {}
   if (q) {
-    // super simple text-ish search (adjust to your schema/indexes)
     Object.assign(filter, {
       $or: [
         { title: { $regex: q, $options: 'i' } },
@@ -182,9 +185,7 @@ export default async function ProjectsPage({
                       {isMember ? (
                         <>
                           <WatchButton projectId={p._id} initialWatching={false} />
-                          {p.status === 'voting' && (
-                            <VoteButtons projectId={p._id} />
-                          )}
+                          {p.status === 'voting' && <VoteButtons projectId={p._id} />}
                           <DonateNowButton projectId={p._id} projectTitle={p.title} />
                         </>
                       ) : (
