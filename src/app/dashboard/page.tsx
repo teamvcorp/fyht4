@@ -4,11 +4,11 @@ import { Container } from '@/components/Container'
 import { FadeIn } from '@/components/FadeIn'
 import { PageIntro } from '@/components/PageIntro'
 import clientPromise from '@/lib/mongodb'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { ObjectId } from 'mongodb'
 import ProfileCard from '@/components/dashboard/ProfileCard'
-import ProjectGrid from '@/components/dashboard/ProjectGrid'
+import ProjectGrid from '@/components/projects/ProjectGrid'
 import { serializeDocs } from '@/lib/serializers' // ⬅️ add this
 
 export const metadata: Metadata = {
