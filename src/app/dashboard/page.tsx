@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { ObjectId } from 'mongodb'
 import ProfileCard from '@/components/dashboard/ProfileCard'
-import ProjectGrid from '@/components/projects/ProjectGrid'
+import ProjectGrid from '@/components/dashboard/ProjectGrid'
 import { serializeDocs } from '@/lib/serializers' // ⬅️ add this
 
 export const metadata: Metadata = {
