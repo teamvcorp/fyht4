@@ -99,8 +99,8 @@ function Header({
             </>
           )}
           {!session?.user && (
-            <button
-              onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+            <Button
+              href="/membership" // ⬅️ dummy href to make it behave like a lin flow
               className={clsx(
                 'rounded-2xl px-4 py-2 text-sm font-semibold transition',
                 invert
@@ -108,8 +108,8 @@ function Header({
                   : 'border border-neutral-300 text-neutral-800 hover:border-neutral-500'
               )}
             >
-              Sign in
-            </button>
+              Sign In / Up
+            </Button>
           )}
           <Button href="/contact" invert={invert}>
             Contact us
