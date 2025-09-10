@@ -1,27 +1,45 @@
+// src/lib/guard.ts
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import type { Session } from 'next-auth'
 import { NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongoose'
 import User from '@/models/User'
 
-export async function getSessionOrResponse() {
-  const session = await getServerSession(authOptions)
+/** The minimal user shape we read for gating */
+type ActiveSub = {
+  status:
+    | 'trialing'
+    | 'active'
+    | 'past_due'
+    | 'canceled'
+    | 'incomplete'
+    | 'incomplete_expired'
+    | 'unpaid'
+  interval: 'day' | 'week' | 'month' | 'year' | null
+  currentPeriodEnd: Date | null
+}
+type GuardUser = {
+  role?: 'user' | 'admin'
+  activeSubscription?: ActiveSub | null
+}
+
+export async function getSessionOrResponse(): Promise<Session | NextResponse> {
+  const session = await getServerSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return session
 }
 
-export function isAdminEmail(email?: string | null) {
+export function isAdminEmail(email?: string | null): boolean {
   const list = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map(s => s.trim().toLowerCase())
-    .filter(Boolean)
   return email ? list.includes(email.toLowerCase()) : false
 }
 
-export async function getAdminOrResponse() {
-  const session = await getServerSession(authOptions)
+export async function getAdminOrResponse(): Promise<Session | NextResponse> {
+  const session = await getServerSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -30,30 +48,41 @@ export async function getAdminOrResponse() {
   }
   return session
 }
-function isMonthlyActive(user: { role?: string; activeSubscription?: any | null }): boolean {
+
+function isMonthlyActive(user: GuardUser | null | undefined): boolean {
   if (user?.role === 'admin') return true // admins bypass
   const sub = user?.activeSubscription
   if (!sub) return false
   if (sub.interval !== 'month') return false
-  const okStatuses = new Set(['trialing', 'active', 'past_due']) // tweak if you want to exclude past_due
-  if (!okStatuses.has(sub.status)) return false
+  const ok = new Set<ActiveSub['status']>(['trialing', 'active', 'past_due'])
+  if (!ok.has(sub.status)) return false
   if (!sub.currentPeriodEnd) return false
   return new Date(sub.currentPeriodEnd).getTime() > Date.now()
 }
 
-export async function requireMonthlySubscriber() {
-  const session = await getServerSession(authOptions)
+/**
+ * Ensures the caller is an active monthly subscriber (or admin).
+ * Returns either a NextResponse (401/403) or the allowed { session, user }.
+ */
+export async function requireMonthlySubscriber(): Promise<
+  NextResponse | { session: Session; user: GuardUser }
+> {
+  const session = await getServerSession()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   await dbConnect()
-  const user = await User.findById(session.user.id).select('role activeSubscription').lean()
+
+  // 👇 Tell Mongoose the exact shape we want back
+  const user = await User.findById(session.user.id)
+    .select('role activeSubscription')
+    .lean<GuardUser | null>()
 
   if (!user || !isMonthlyActive(user)) {
     return NextResponse.json(
       { error: 'You must be an active monthly subscriber to perform this action.' },
-      { status: 403 }
+      { status: 403 },
     )
   }
 
