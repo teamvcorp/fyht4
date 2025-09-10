@@ -1,11 +1,16 @@
-import { NextAuthOptions } from 'next-auth'
+import type { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import EmailProvider from 'next-auth/providers/email'
 import { MongoDBAdapter } from '@next-auth/mongodb-adapter'
 import clientPromise from '@/lib/mongodb'
 import { Resend } from 'resend'
+import User from '@/models/User'
+import type { UserRole, Zipcode } from '@/types/user'
 
-export const runtime = 'nodejs'
+if (!process.env.GOOGLE_CLIENT_ID) throw new Error('Missing GOOGLE_CLIENT_ID')
+if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error('Missing GOOGLE_CLIENT_SECRET')
+if (!process.env.RESEND_API_KEY) throw new Error('Missing RESEND_API_KEY')
+if (!process.env.RESEND_FROM_EMAIL) throw new Error('Missing RESEND_FROM_EMAIL')
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
@@ -24,8 +29,8 @@ export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   session: { strategy: 'jwt' },
   pages: {
-    signIn: '/membership', // optional: send users to your membership page
-    verifyRequest: '/membership/verify', // optional landing after email sent
+    signIn: '/membership',
+    verifyRequest: '/membership/verify',
   },
   providers: [
     GoogleProvider({
@@ -35,7 +40,7 @@ export const authOptions: NextAuthOptions = {
     }),
     EmailProvider({
       maxAge: 24 * 60 * 60, // 24h
-      sendVerificationRequest: async ({ identifier, url, provider }) => {
+      sendVerificationRequest: async ({ identifier, url }) => {
         const { host } = new URL(url)
         await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL!, // e.g. "FYHT4 <login@fyht4.com>"
@@ -46,32 +51,65 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
- callbacks: {
+  callbacks: {
     async jwt({ token, user }) {
-      // ensure the id is always on the token (for JWT sessions)
+      // Keep an explicit id on the token
       if (user) {
-        // NextAuth sets token.sub to user id already; keep an explicit id too
-        (token as any).id = (user as any).id ?? token.sub
+        (token as any).id =
+          (user as any).id ??
+          (user as any)?._id?.toString() ??
+          token.sub
+      } else if (!(token as any).id && token?.sub) {
+        (token as any).id = token.sub
       }
+
+      // Enrich with role/zipcode when signing in or when missing
+      if (user || !(token as any).role) {
+        try {
+          const userId =
+            (user as any)?.id ??
+            (user as any)?._id?.toString() ??
+            (token as any).id ??
+            token.sub
+
+          if (userId) {
+            const doc = await User.findById(userId)
+              .select('role zipcode')
+              .lean()
+            ;(token as any).role = doc?.role || 'user'
+            ;(token as any).zipcode = doc?.zipcode  ?? null
+          } else {
+            ;(token as any).role = (token as any).role || 'user'
+            ;(token as any).zipcode = (token as any).zipcode ?? null
+          }
+        } catch {
+          ;(token as any).role = (token as any).role || 'user'
+          ;(token as any).zipcode = (token as any).zipcode ?? null
+        }
+      }
+
       return token
     },
-    async session({ session, token, user }) {
-      // Works for both strategies:
-      // - JWT: read from token.id or token.sub
-      // - Database: read from user.id
+
+    async session({ session, token }) {
       const id =
         (token as any)?.id ??
         token?.sub ??
-        (user as any)?.id
+        (session.user as any)?.id
 
       if (session.user && id) {
         (session.user as any).id = id
       }
+      if (session.user) {
+        ;(session.user as any).role = (token as any)?.role || 'user'
+        ;(session.user as any).zipcode = (token as any)?.zipcode ?? null
+      }
       return session
     },
-  },
+  }, // <-- this was missing in your snippet
+
   events: {
-    // Send a welcome email to brand-new users (first sign-in)
+    // Welcome email on first sign-in
     createUser: async ({ user }) => {
       if (!user.email) return
       try {
@@ -91,5 +129,3 @@ export const authOptions: NextAuthOptions = {
     },
   },
 }
-
-

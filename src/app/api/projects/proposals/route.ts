@@ -1,13 +1,14 @@
 // src/app/api/projects/proposals/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import clientPromise from '@/lib/mongodb'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ObjectId } from 'mongodb'
+import dbconnect from '@/lib/mongoose'
+import ProjectProposal from '@/models/ProjectProposal'
+import { Types } from 'mongoose'
 
 export const runtime = 'nodejs'
 
-// Helper: read JSON or form-encoded bodies
+// Helper: read JSON or form-encoded bodies (kept from your original)
 async function readBody(req: NextRequest) {
   const ct = req.headers.get('content-type') || ''
   if (ct.includes('application/json')) {
@@ -19,19 +20,24 @@ async function readBody(req: NextRequest) {
     for (const [k, v] of fd.entries()) obj[k] = String(v)
     return obj
   }
-  // fallback
-  try { return await req.json() } catch { return {} }
+  try {
+    return await req.json()
+  } catch {
+    return {}
+  }
 }
 
 export async function POST(req: NextRequest) {
-  // auth
+  // auth (same behavior: 401 JSON when not signed in)
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  await dbconnect()
+
   // parse body
-  const body = await readBody(req)
+  const body = (await readBody(req)) as Record<string, any>
   const {
     title,
     category,
@@ -40,17 +46,19 @@ export async function POST(req: NextRequest) {
     description = '',
     fundingGoal,
     voteGoal,
-  } = body as Record<string, any>
+  } = body
 
-  // validate
+  // validate (same rules)
   if (!title || !zipcode || fundingGoal == null || voteGoal == null) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
   if (!/^\d{5}(-\d{4})?$/.test(String(zipcode))) {
     return NextResponse.json({ error: 'Invalid zipcode' }, { status: 400 })
   }
+
   const fundingCents = Math.round(Number(fundingGoal) * 100)
   const voteGoalNum = Number(voteGoal)
+
   if (!Number.isFinite(fundingCents) || fundingCents < 100) {
     return NextResponse.json({ error: 'Funding goal must be at least $1' }, { status: 400 })
   }
@@ -58,25 +66,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Vote goal must be ≥ 1' }, { status: 400 })
   }
 
-  // insert
-  const db = (await clientPromise).db()
-  const doc = {
+  // insert via Mongoose (same fields, same defaults)
+  const doc = await ProjectProposal.create({
     title: String(title).trim(),
     category: category ? String(category).trim() : 'General',
-    zipcode: String(zipcode),
+    zipcode: String(zipcode).trim(),
     shortDescription: String(shortDescription).trim(),
     description: String(description).trim(),
     fundingGoal: fundingCents,
     voteGoal: voteGoalNum,
-    createdBy: new ObjectId(session.user.id),
-    createdAt: new Date(),
-    status: 'pending' as const,
+    createdBy: new Types.ObjectId((session.user as any).id),
+    status: 'pending',
     adminNotes: '',
-  }
+  })
 
-  const res = await db.collection('project_proposals').insertOne(doc)
-
-  // If the request came from an HTML form, redirect to a friendly page
+  // Preserve original behavior:
+  // If Accept: text/html (from a form submit), redirect with 303
   const accept = req.headers.get('accept') || ''
   if (accept.includes('text/html')) {
     const url = new URL('/dashboard?submitted=1', req.url)
@@ -84,5 +89,5 @@ export async function POST(req: NextRequest) {
   }
 
   // Otherwise return JSON
-  return NextResponse.json({ ok: true, id: String(res.insertedId) })
+  return NextResponse.json({ ok: true, id: String(doc._id) })
 }

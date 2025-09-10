@@ -1,10 +1,15 @@
 // app/projects/[id]/page.tsx
 import { notFound } from 'next/navigation'
-import { type Metadata } from 'next'
-import { ObjectId, type Filter } from 'mongodb'
+import type { Metadata } from 'next'
+import { ObjectId } from 'mongodb'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import clientPromise from '@/lib/mongodb'
+import dbConnect from '@/lib/mongoose'
+// Ensure Mongoose connection & import model/types
+
+import Project, { type IProject } from '@/models/Project'
+
 import { serializeDoc, serializeDocs } from '@/lib/serializers'
 
 import { RootLayout } from '@/components/RootLayout'
@@ -14,42 +19,22 @@ import ProjectDonatePanel from '@/components/projects/ProjectDonatePanel'
 import WatchButton from '@/components/projects/WatchButton'
 import ProjectGrid from '@/components/dashboard/ProjectGrid'
 
-// Keep this in a shared file if you prefer (e.g., src/types/project.ts)
-type ProjectStatus = 'voting' | 'funding' | 'build' | 'completed'
-type Project = {
-  _id: ObjectId
-  title: string
-  slug?: string
-  category?: string
-  zipcode?: string
-  shortDescription?: string
-  description?: string
-  coverImage?: string | null
-  status?: ProjectStatus
-  fundingGoal?: number
-  totalRaised?: number
-  votesYes?: number
-  voteGoal?: number
-  createdAt?: Date
-}
-
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function generateMetadata(
   { params }: { params: { id: string } }
 ): Promise<Metadata> {
-  const db = (await clientPromise).db()
-  const projects = db.collection<Project>('projects')
-
+  // params is always a plain object, not a Promise, so you do not need to await it.
+  // You can use params directly:
   const id = decodeURIComponent(params.id)
-  let project: Project | null = null
 
-  // Try ObjectId, then slug
+  let project: (IProject & { _id: ObjectId }) | null = null
   if (ObjectId.isValid(id)) {
-    project = await projects.findOne({ _id: new ObjectId(id) } as Filter<Project>)
+    project = (await Project.findById(id).lean()) as any
   }
   if (!project) {
-    project = await projects.findOne({ slug: id } as Filter<Project>)
+    project = (await Project.findOne({ slug: id }).lean()) as any
   }
   if (!project) return { title: 'Project not found' }
 
@@ -59,7 +44,7 @@ export async function generateMetadata(
     openGraph: {
       title: project.title,
       description: project.shortDescription || '',
-      images: project.coverImage ? [{ url: project.coverImage }] : [],
+      images: project.coverImage ? [{ url: String(project.coverImage) }] : [],
     },
   }
 }
@@ -67,53 +52,43 @@ export async function generateMetadata(
 export default async function ProjectPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   const db = (await clientPromise).db()
-  const projects = db.collection<Project>('projects')
+   await dbConnect()
 
   const id = decodeURIComponent(params.id)
-  let project: Project | null = null
 
-  // Try ObjectId, then slug
+  // Fetch project by ObjectId or slug
+  let project: any = null
   if (ObjectId.isValid(id)) {
-    project = await projects.findOne({ _id: new ObjectId(id) } as Filter<Project>)
+    project = await Project.findById(id).lean()
   }
   if (!project) {
-    project = await projects.findOne({ slug: id } as Filter<Project>)
+    project = await Project.findOne({ slug: id }).lean()
   }
   if (!project) notFound()
 
-  // Is the current user watching?
+  // Is current user watching?
   let isWatching = false
   if (session?.user?.id) {
     const entry = await db.collection('watchlist').findOne({
       userId: new ObjectId(session.user.id),
-      projectId: project._id,
+      projectId: new ObjectId(project._id),
     })
     isWatching = !!entry
   }
 
-  // Related by ZIP
+  // Related by ZIP (exclude self)
   const relatedRaw = project.zipcode
-    ? await projects
-        .find(
-          { zipcode: String(project.zipcode), _id: { $ne: project._id } } as Filter<Project>,
-          {
-            projection: {
-              title: 1,
-              category: 1,
-              zipcode: 1,
-              shortDescription: 1,
-              coverImage: 1,
-              status: 1,
-              createdAt: 1,
-            },
-          },
-        )
+    ? await Project.find({
+        zipcode: String(project.zipcode),
+        _id: { $ne: project._id },
+      })
+        .select('title category zipcode shortDescription coverImage status createdAt')
         .sort({ createdAt: -1 })
         .limit(6)
-        .toArray()
+        .lean()
     : []
 
-  // ✅ Convert docs to JSON-safe objects before passing to Client Components
+  // Convert Mongo types to JSON-safe
   const projectPlain = serializeDoc(project)
   const related = serializeDocs(relatedRaw)
 
@@ -181,7 +156,7 @@ export default async function ProjectPage({ params }: { params: { id: string } }
             More projects in {projectPlain.zipcode ? `ZIP ${projectPlain.zipcode}` : 'this area'}
           </h2>
           <p className="mt-2 text-neutral-600">Explore more community-led initiatives nearby.</p>
-          <ProjectGrid items={related} emptyText="No related projects yet." />
+          <ProjectGrid items={related as any[]} emptyText="No related projects yet." />
         </FadeIn>
       </Container>
     </RootLayout>

@@ -3,14 +3,17 @@ import { RootLayout } from '@/components/RootLayout'
 import { Container } from '@/components/Container'
 import { FadeIn } from '@/components/FadeIn'
 import { PageIntro } from '@/components/PageIntro'
-import clientPromise from '@/lib/mongodb'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { ObjectId } from 'mongodb'
+import dbconnect from '@/lib/mongoose'
+import User from '@/models/User'
+import Project, {IProject} from '@/models/Project'
+import Donation from '@/models/Donation'
+import Watchlist from '@/models/Watchlist'
+import { serializeDocs } from '@/lib/serializers'
 import ProfileCard from '@/components/dashboard/ProfileCard'
 import ProjectGrid from '@/components/dashboard/ProjectGrid'
-import { serializeDocs } from '@/lib/serializers' // ⬅️ add this
-
+import { isPromise } from 'util/types'
 export const metadata: Metadata = {
   title: 'Dashboard',
   description:
@@ -18,6 +21,8 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
+  await dbconnect()
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return (
@@ -44,103 +49,52 @@ export default async function DashboardPage() {
     )
   }
 
-  const db = (await clientPromise).db()
-  const userId = new ObjectId(session.user.id)
+  // User via Mongoose
+  const user = await User.findById(session.user.id)
+    .select('name email zipcode')
+    .lean() as { name?: string; email?: string; zipcode?: string }
 
-  const user = await db.collection('users').findOne(
-    { _id: userId },
-    { projection: { name: 1, email: 1, zipcode: 1 } },
-  )
+  // Donations -> populated projects
+  const donationDocs = await Donation.find({ userId: session.user.id })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: 'projectId',
+      select:
+        'title category zipcode shortDescription coverImage status fundingGoal totalRaised votesYes voteGoal createdAt',
+    })
+    .lean()
 
-  // Donations -> joined projects
-  const donations = await db
-    .collection('donations')
-    .aggregate([
-      { $match: { userId } },
-      { $sort: { createdAt: -1 } },
-      { $lookup: { from: 'projects', localField: 'projectId', foreignField: '_id', as: 'project' } },
-      { $unwind: '$project' },
-      {
-        $project: {
-          _id: 1,
-          amount: 1,
-          createdAt: 1,
-          'project._id': 1,
-          'project.title': 1,
-          'project.category': 1,
-          'project.zipcode': 1,
-          'project.shortDescription': 1,
-          'project.coverImage': 1,
-          'project.status': 1,
-          'project.fundingGoal': 1,
-          'project.totalRaised': 1,
-          'project.votesYes': 1,
-          'project.voteGoal': 1,
-        },
-      },
-    ])
-    .toArray()
+  const donatedProjectsRaw = donationDocs
+    .map(d => d.projectId)
+    .filter(Boolean) as any[]
 
-  // Watching -> joined projects
-  const watching = await db
-    .collection('watchlist')
-    .aggregate([
-      { $match: { userId } },
-      { $sort: { createdAt: -1 } },
-      { $lookup: { from: 'projects', localField: 'projectId', foreignField: '_id', as: 'project' } },
-      { $unwind: '$project' },
-      {
-        $project: {
-          _id: 1,
-          createdAt: 1,
-          'project._id': 1,
-          'project.title': 1,
-          'project.category': 1,
-          'project.zipcode': 1,
-          'project.shortDescription': 1,
-          'project.coverImage': 1,
-          'project.status': 1,
-          'project.fundingGoal': 1,
-          'project.totalRaised': 1,
-          'project.votesYes': 1,
-          'project.voteGoal': 1,
-        },
-      },
-    ])
-    .toArray()
+  // Watchlist -> populated projects
+  const watchDocs = await Watchlist.find({ userId: session.user.id })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: 'projectId',
+      select:
+        'title category zipcode shortDescription coverImage status fundingGoal totalRaised votesYes voteGoal createdAt',
+    })
+    .lean()
 
-  // Local projects
-  const localProjects =
-    user?.zipcode
-      ? await db
-          .collection('projects')
-          .find(
-            { zipcode: String(user.zipcode) },
-            {
-              projection: {
-                title: 1,
-                category: 1,
-                zipcode: 1,
-                shortDescription: 1,
-                coverImage: 1,
-                status: 1,
-                fundingGoal: 1,
-                totalRaised: 1,
-                votesYes: 1,
-                voteGoal: 1,
-                createdAt: 1,
-              },
-            },
-          )
-          .sort({ createdAt: -1 })
-          .limit(12)
-          .toArray()
-      : []
+  const watchingProjectsRaw = watchDocs
+    .map(w => w.projectId)
+    .filter(Boolean) as any[]
 
-  // ✅ Make props JSON-safe for client components
-  const donatedProjects = serializeDocs(donations.map((d) => d.project))
-  const watchingProjects = serializeDocs(watching.map((w) => w.project))
-  const localProjectsPlain = serializeDocs(localProjects)
+  // Local projects by ZIP
+  const localProjectsRaw = user?.zipcode
+    ? await Project.find({ zipcode: String(user.zipcode) })
+        .select('title category zipcode shortDescription coverImage status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(12)
+        .lean<IProject[]>()
+    : []
+
+  // JSON-safe for client components
+  const donatedProjects = serializeDocs(donatedProjectsRaw)
+  const watchingProjects = serializeDocs(watchingProjectsRaw)
+  const localProjects = serializeDocs(localProjectsRaw)
 
   return (
     <RootLayout>
@@ -197,7 +151,7 @@ export default async function DashboardPage() {
               : 'Add your ZIP in your profile to see local projects.'}
           </p>
           <ProjectGrid
-            items={localProjectsPlain}
+            items={localProjects}
             emptyText={user?.zipcode ? 'No local projects yet.' : 'Set your ZIP to view local projects.'}
           />
         </FadeIn>

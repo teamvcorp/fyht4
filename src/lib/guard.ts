@@ -23,7 +23,7 @@ export async function getAdminOrResponse() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!isAdminEmail(session.user?.email as string)) {
+  if (session.user?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   return session

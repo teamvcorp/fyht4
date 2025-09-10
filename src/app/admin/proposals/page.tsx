@@ -1,18 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { RootLayout } from '@/components/RootLayout'
 import { Container } from '@/components/Container'
 import { FadeIn } from '@/components/FadeIn'
 
-type Proposal = {
+/** Mirror the server model (ProjectProposal) as a DTO for the client */
+type ProposalDTO = {
   _id: string
   title: string
   category?: string
   zipcode: string
   shortDescription?: string
   description?: string
-  fundingGoal: number // cents
+  fundingGoal: number   // cents
   voteGoal: number
   createdAt?: string
   createdBy?: string
@@ -20,7 +23,10 @@ type Proposal = {
 }
 
 export default function AdminProposalsPage() {
-  const [items, setItems] = useState<Proposal[] | null>(null)
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  const [items, setItems] = useState<ProposalDTO[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({})
@@ -32,25 +38,31 @@ export default function AdminProposalsPage() {
       setError(null)
       setLoading(true)
       const res = await fetch('/api/admin/proposals', { cache: 'no-store' })
-      if (res.status === 401 || res.status === 403) {
-        setError('You must be an admin to view this page.')
+
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({})))?.error || 'Failed to load proposals'
+        setError(msg)
         setItems([])
         return
       }
+
       const data = await res.json()
-      const normalized: Proposal[] = (data.items || []).map((p: any) => ({
+
+      // Normalize API docs (from Mongoose ProjectProposal) into client-safe DTOs
+      const normalized: ProposalDTO[] = (data.items || []).map((p: any) => ({
         _id: String(p._id),
-        title: p.title,
-        category: p.category,
+        title: String(p.title),
+        category: p.category || '',
         zipcode: String(p.zipcode),
         shortDescription: p.shortDescription || '',
         description: p.description || '',
         fundingGoal: Number(p.fundingGoal || 0),
         voteGoal: Number(p.voteGoal || 0),
-        createdAt: p.createdAt,
+        createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : undefined,
         createdBy: p.createdBy ? String(p.createdBy) : undefined,
-        status: p.status,
+        status: p.status as 'pending' | 'approved' | 'rejected',
       }))
+
       setItems(normalized)
     } catch (e: any) {
       setError(e?.message || 'Failed to load proposals')
@@ -59,7 +71,22 @@ export default function AdminProposalsPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Gate: only admins can load
+  useEffect(() => {
+    if (status === 'loading') return
+
+    if (!session?.user) {
+      router.replace('/membership?from=/admin/proposals')
+      return
+    }
+    if (session.user.role !== 'admin') {
+      setError('You must be an admin to view this page.')
+      setItems([])
+      return
+    }
+
+    load()
+  }, [status, session, router])
 
   function setNote(id: string, v: string) {
     setNoteDrafts(prev => ({ ...prev, [id]: v }))
@@ -69,24 +96,29 @@ export default function AdminProposalsPage() {
     try {
       setBusyId(id)
       const adminNotes = (noteDrafts[id] || '').trim()
+
       if (action === 'reject' && !adminNotes) {
         alert('Please add admin notes for rejection.')
         setBusyId(null)
         return
       }
+
       const res = await fetch(`/api/admin/proposals/${id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action, adminNotes }),
       })
+
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({})))?.error || 'Action failed'
         alert(msg)
         return
       }
-      // Remove the processed proposal from the list
+
+      // Remove processed proposal from the list
       setItems(prev => (prev ? prev.filter(p => p._id !== id) : prev))
-      // Clean up note & busy state
+
+      // Clean up note
       setNoteDrafts(prev => {
         const { [id]: _, ...rest } = prev
         return rest
@@ -108,7 +140,8 @@ export default function AdminProposalsPage() {
             Admin • Proposals
           </h1>
           <p className="mt-2 text-neutral-600">
-            Review member submissions and move approved proposals into the public project list (status: <span className="font-medium">voting</span>).
+            Review member submissions and move approved proposals into the public project list (status:{' '}
+            <span className="font-medium">voting</span>).
           </p>
 
           {error && (
@@ -117,7 +150,7 @@ export default function AdminProposalsPage() {
             </div>
           )}
 
-          {loading && (
+          {(status === 'loading' || loading) && (
             <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-600">
               Loading…
             </div>
@@ -182,7 +215,7 @@ export default function AdminProposalsPage() {
                     {/* Admin notes */}
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-neutral-800">
-                        Admin notes {/** (required for rejection) */}
+                        Admin notes
                       </label>
                       <textarea
                         value={noteDrafts[p._id] || ''}

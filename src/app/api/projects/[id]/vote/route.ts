@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { getSessionOrResponse } from '@/lib/guard'
 import { ObjectId } from 'mongodb'
+import Project from '@/models/Project'
+import dbConnect from '@/lib/mongoose'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  await dbConnect()
   const {id} = await ctx.params
   // Auth: return 401 JSON if not signed in
   const session = await getSessionOrResponse()
@@ -30,7 +33,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   // Load project and validate status
   const projectId = new ObjectId(id)
-  const project = await db.collection('projects').findOne({ _id: projectId })
+  const project = await Project.findById(id).lean()
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   if (project.status !== 'voting') {
     return NextResponse.json({ error: 'Voting is not open for this project' }, { status: 400 })
