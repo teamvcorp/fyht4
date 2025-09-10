@@ -24,15 +24,29 @@ function magicLinkEmailHtml(url: string, host: string) {
     <p style="color:#6b7280;font-size:12px">FYHT4 • ${host}</p>
   </div>`
 }
-function computeIsSubscriber(user: { activeSubscription?: any | null }) {
+
+/** Minimal shape we read from User in callbacks */
+type ActiveSub = {
+  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid'
+  interval: 'day' | 'week' | 'month' | 'year' | null
+  currentPeriodEnd: Date | null
+}
+type UserMeta = {
+  role?: 'user' | 'admin'
+  zipcode?: string | null
+  activeSubscription?: ActiveSub | null
+}
+
+function computeIsSubscriber(user: UserMeta | null | undefined) {
   const sub = user?.activeSubscription
   if (!sub) return false
   if (sub.interval !== 'month') return false
-  const ok = new Set(['trialing', 'active', 'past_due'])
+  const ok = new Set<ActiveSub['status']>(['trialing', 'active', 'past_due'])
   if (!ok.has(sub.status)) return false
   if (!sub.currentPeriodEnd) return false
   return new Date(sub.currentPeriodEnd).getTime() > Date.now()
 }
+
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   session: { strategy: 'jwt' },
@@ -47,7 +61,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     EmailProvider({
-      maxAge: 24 * 60 * 60, // 24h
+      maxAge: 24 * 60 * 60,
       sendVerificationRequest: async ({ identifier, url }) => {
         const { host } = new URL(url)
         await resend.emails.send({
@@ -61,74 +75,46 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // Keep an explicit id on the token
+      // Always keep an explicit id (besides token.sub)
       if (user) {
-        (token as any).id =
-          (user as any).id ??
-          (user as any)?._id?.toString() ??
-          token.sub
+        (token as any).id = (user as any).id ?? (user as any)?._id?.toString() ?? token.sub
       } else if (!(token as any).id && token?.sub) {
         (token as any).id = token.sub
       }
-      if (user && !(token as any).id) (token as any).id = (user as any)?.id ?? token.sub
 
-      // enrich with sub snapshot when missing or on fresh user
-      if (user || (token as any).isSubscriber === undefined) {
+      // Load role, zipcode, and subscription snapshot exactly once (or when fresh user)
+      if (user || (token as any).role === undefined || (token as any).isSubscriber === undefined) {
         try {
           await dbConnect()
-          const doc = await User.findById((token as any).id ?? token.sub)
+          const userId = (token as any).id ?? token.sub
+          const doc = await User.findById(userId)
             .select('activeSubscription role zipcode')
-            .lean()
-            ; (token as any).role = doc?.role || 'user'
-            ; (token as any).zipcode = doc?.zipcode ?? null
-            ; (token as any).isSubscriber = computeIsSubscriber(doc || {})
+            .lean<UserMeta | null>() // 👈 precise type here
+          ;(token as any).role = doc?.role ?? 'user'
+          ;(token as any).zipcode = doc?.zipcode ?? null
+          ;(token as any).isSubscriber = computeIsSubscriber(doc)
         } catch {
-          ; (token as any).role = (token as any).role || 'user'
-            ; (token as any).zipcode = (token as any).zipcode ?? null
-            ; (token as any).isSubscriber = false
-        }
-      }
-      // Enrich with role/zipcode when signing in or when missing
-      if (user || !(token as any).role) {
-        try {
-          const userId =
-            (user as any)?.id ??
-            (user as any)?._id?.toString() ??
-            (token as any).id ??
-            token.sub
-
-          if (userId) {
-            const doc = await User.findById(userId)
-              .select('role zipcode')
-              .lean()
-              ; (token as any).role = doc?.role || 'user'
-              ; (token as any).zipcode = doc?.zipcode ?? null
-          } else {
-            ; (token as any).role = (token as any).role || 'user'
-              ; (token as any).zipcode = (token as any).zipcode ?? null
-          }
-        } catch {
-          ; (token as any).role = (token as any).role || 'user'
-            ; (token as any).zipcode = (token as any).zipcode ?? null
+          ;(token as any).role = (token as any).role ?? 'user'
+          ;(token as any).zipcode = (token as any).zipcode ?? null
+          ;(token as any).isSubscriber = false
         }
       }
 
       return token
     },
 
-     async session({ session, token }) {
-    if (session.user) {
-      ;(session.user as any).id = (token as any)?.id ?? token.sub
-      ;(session.user as any).role = (token as any)?.role || 'user'
-      ;(session.user as any).zipcode = (token as any)?.zipcode ?? null
-      ;(session.user as any).isSubscriber = !!(token as any)?.isSubscriber
-    }
-    return session
+    async session({ session, token }) {
+      if (session.user) {
+        ;(session.user as any).id = (token as any)?.id ?? token.sub
+        ;(session.user as any).role = (token as any)?.role ?? 'user'
+        ;(session.user as any).zipcode = (token as any)?.zipcode ?? null
+        ;(session.user as any).isSubscriber = Boolean((token as any)?.isSubscriber)
+      }
+      return session
+    },
   },
-  }, // <-- this was missing in your snippet
 
   events: {
-    // Welcome email on first sign-in
     createUser: async ({ user }) => {
       if (!user.email) return
       try {
