@@ -95,4 +95,4 @@ const UserModel: Model<IUser> =
   (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', UserSchema)
 
 export default UserModel
-export type { IUser as UserDocument, IActiveSubscription }
+export type { IUser as UserDocument }
