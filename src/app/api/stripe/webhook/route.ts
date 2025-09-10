@@ -108,17 +108,17 @@ async function upsertUserFromSubscription(sub: Stripe.Subscription) {
         activeSubscription: shouldClear
           ? null
           : {
-              id: sub.id,
-              status: snap.status,
-              interval: snap.interval,
-              amount: snap.amount,
-              currency: snap.currency,
-              currentPeriodEnd: snap.currentPeriodEnd,
-              cancelAtPeriodEnd: snap.cancelAtPeriodEnd,
-              customerId: snap.customerId,
-              priceId: snap.priceId,
-              productId: snap.productId,
-            },
+            id: sub.id,
+            status: snap.status,
+            interval: snap.interval,
+            amount: snap.amount,
+            currency: snap.currency,
+            currentPeriodEnd: snap.currentPeriodEnd,
+            cancelAtPeriodEnd: snap.cancelAtPeriodEnd,
+            customerId: snap.customerId,
+            priceId: snap.priceId,
+            productId: snap.productId,
+          },
       },
     }
   )
@@ -150,6 +150,30 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        const customerId = typeof session.customer === 'string'
+          ? session.customer
+          : session.customer?.id
+
+        // Prefer explicit user id from metadata or client_reference_id
+        const metaUserId = (session.metadata?.userId as string | undefined)
+          || (session.client_reference_id as string | undefined)
+
+        if (customerId && metaUserId) {
+          await dbConnect()
+          await User.updateOne(
+            { _id: metaUserId },
+            { $set: { stripeCustomerId: customerId } }
+          )
+        }
+
+        // If it's a subscription flow, you can still retrieve the subscription
+        // and run your existing upsert/subscription snapshot logic afterward.
+        // ...
+        break
+      }
+
       // After Checkout for subscriptions, prime activeSubscription
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session

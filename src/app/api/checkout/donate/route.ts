@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import dbConnect from '@/lib/mongoose'
-import User, { IUser } from '@/models/User'   // ⬅️ ensure this exports IUser
+import User, { IUser } from '@/models/User'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,6 +17,10 @@ export async function GET(req: NextRequest) {
   try {
     await dbConnect()
 
+    // ── Auth/session (use this instead of passing userId via query) ──
+    const session = await getServerSession(authOptions)
+    const userIdFromSession = session?.user?.id || undefined
+
     const { searchParams } = new URL(req.url)
     const frequency = (searchParams.get('frequency') || 'once').toLowerCase()
     const isMonthly = frequency === 'monthly'
@@ -24,30 +30,24 @@ export async function GET(req: NextRequest) {
     }
 
     const campaign = (searchParams.get('campaign') || '').trim()
-    // optional prefill email from query (kept for parity)
     const emailFromQuery = searchParams.get('email') || undefined
 
-    // ——— site URLs ———
+    // URLs
     const url = new URL(req.url)
     const origin = req.headers.get('origin') || `${url.protocol}//${url.host}`
     const site = process.env.NEXT_PUBLIC_SITE_URL || origin
     const success_url = `${site}/thank-you?status=success`
     const cancel_url  = `${site}/donate?status=cancelled`
 
-    // ——— Try to find a logged-in user and reuse Stripe customer ———
-    // If you have access to the session here, you can pass a userId into this route,
-    // or read it another way. If not, this block is just a safe optional enhancement.
+    // ── Reuse Stripe customer if the user already has one ──
     let customer: string | undefined
     let prefillEmail: string | undefined = emailFromQuery
 
-    // If you already put userId in the query, you can read it:
-    const userId = searchParams.get('userId') || undefined
-
-    if (userId) {
-      type UserLean = Pick<IUser, 'email' | 'stripeCustomerId'>
-      const user = await User.findById(userId)
+    if (userIdFromSession) {
+      // Force a lean, well-typed result (avoid Mongoose union weirdness)
+      const user = await User.findById(userIdFromSession)
         .select('email stripeCustomerId')
-        .lean<UserLean | null>()
+        .lean<{ email?: string; stripeCustomerId?: string } | null>()
 
       if (user?.stripeCustomerId) {
         customer = user.stripeCustomerId
@@ -56,17 +56,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Single line item (donation or monthly membership)
     const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = {
       quantity: 1,
       price_data: {
         currency: 'usd',
         unit_amount: amount,
         product_data: {
-          name: isMonthly ? 'FYHT4 Monthly Donation' : 'FYHT4 Donation',
+          name: isMonthly ? 'FYHT4 Monthly Membership' : 'FYHT4 Donation',
         },
         ...(isMonthly ? { recurring: { interval: 'month' } } : {}),
       },
     }
+
+    // Metadata shared across session & (if subscription) the subscription itself
+    const meta: Record<string, string> = { campaign, source: 'donate_page' }
+    if (userIdFromSession) meta.userId = userIdFromSession
 
     const params: Stripe.Checkout.SessionCreateParams = {
       mode: isMonthly ? 'subscription' : 'payment',
@@ -75,20 +80,19 @@ export async function GET(req: NextRequest) {
       cancel_url,
       billing_address_collection: 'auto',
       ...(isMonthly ? {} : { submit_type: 'donate' }),
-      metadata: { campaign, source: 'donate_page' },
+      metadata: meta,
+      ...(userIdFromSession ? { client_reference_id: userIdFromSession } : {}), // helpful in webhook
       ...(customer ? { customer } : {}),
       ...(!customer && prefillEmail ? { customer_email: prefillEmail } : {}),
     }
 
     if (isMonthly) {
-      // Attach campaign to the subscription itself for reliable attribution later
-      ;(params as any).subscription_data = {
-        metadata: { campaign },
-      }
+      // Ensure userId/campaign live on the subscription itself (webhook-friendly)
+      ;(params as any).subscription_data = { metadata: meta }
     }
 
-    const session = await stripe.checkout.sessions.create(params)
-    return NextResponse.json({ url: session.url })
+    const sessionResp = await stripe.checkout.sessions.create(params)
+    return NextResponse.json({ url: sessionResp.url })
   } catch (err: any) {
     console.error('Checkout error:', {
       type: err?.type,

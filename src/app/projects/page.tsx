@@ -40,6 +40,7 @@ export const metadata: Metadata = {
   description: 'Explore community-led projects. Sort by ZIP, city, or state and take action.',
 }
 
+export const runtime = 'nodejs' 
 export const dynamic = 'force-dynamic'
 
 export default async function ProjectsPage({
