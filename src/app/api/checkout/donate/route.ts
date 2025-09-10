@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const origin = req.headers.get('origin') || `${url.protocol}//${url.host}`
     const site = process.env.NEXT_PUBLIC_SITE_URL || origin
     const success_url = `${site}/thank-you?status=success`
-    const cancel_url  = `${site}/donate?status=cancelled`
+    const cancel_url  = `${site}/payment-failure?reason=cancelled`
 
     // ── Reuse Stripe customer if the user already has one ──
     let customer: string | undefined
