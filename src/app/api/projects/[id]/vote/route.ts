@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // <-- params is a Promise in Next 15
 ) {
-  const { id } = params
+  const { id } = await params
 
   // Require active monthly subscriber (your guard returns Response or { session })
   const gate = await requireMonthlySubscriber()
