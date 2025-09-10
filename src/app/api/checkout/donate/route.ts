@@ -1,20 +1,19 @@
-// app/api/checkout/donate/route.ts
+// src/app/api/checkout/donate/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import dbConnect from '@/lib/mongoose'
-import User from '@/models/User'
+import User, { IUser } from '@/models/User'   // ⬅️ ensure this exports IUser
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, { apiVersion: '2025-08-27.basil' })
+const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+})
 
 export async function GET(req: NextRequest) {
   try {
-    const sessionAuth = await getServerSession(authOptions)
-    const userId = sessionAuth?.user?.id || null
+    await dbConnect()
 
     const { searchParams } = new URL(req.url)
     const frequency = (searchParams.get('frequency') || 'once').toLowerCase()
@@ -25,27 +24,35 @@ export async function GET(req: NextRequest) {
     }
 
     const campaign = (searchParams.get('campaign') || '').trim()
-    const emailQS = searchParams.get('email') || undefined
+    // optional prefill email from query (kept for parity)
+    const emailFromQuery = searchParams.get('email') || undefined
 
+    // ——— site URLs ———
     const url = new URL(req.url)
     const origin = req.headers.get('origin') || `${url.protocol}//${url.host}`
     const site = process.env.NEXT_PUBLIC_SITE_URL || origin
     const success_url = `${site}/thank-you?status=success`
-    const cancel_url = `${site}/donate?status=cancelled`
+    const cancel_url  = `${site}/donate?status=cancelled`
 
-    // Try to reuse an existing Stripe customer if user is logged in
+    // ——— Try to find a logged-in user and reuse Stripe customer ———
+    // If you have access to the session here, you can pass a userId into this route,
+    // or read it another way. If not, this block is just a safe optional enhancement.
     let customer: string | undefined
-    let customer_email: string | undefined = emailQS
+    let prefillEmail: string | undefined = emailFromQuery
 
-    if (isMonthly && userId) {
-      await dbConnect()
-      const user = await User.findById(userId).select('email stripeCustomerId').lean()
+    // If you already put userId in the query, you can read it:
+    const userId = searchParams.get('userId') || undefined
+
+    if (userId) {
+      type UserLean = Pick<IUser, 'email' | 'stripeCustomerId'>
+      const user = await User.findById(userId)
+        .select('email stripeCustomerId')
+        .lean<UserLean | null>()
 
       if (user?.stripeCustomerId) {
         customer = user.stripeCustomerId
       } else if (user?.email) {
-        // Stripe will auto-dedupe customers on the same email in many cases
-        customer_email = user.email
+        prefillEmail = user.email
       }
     }
 
@@ -68,21 +75,16 @@ export async function GET(req: NextRequest) {
       cancel_url,
       billing_address_collection: 'auto',
       ...(isMonthly ? {} : { submit_type: 'donate' }),
-
-      // Tag the session so webhooks can resolve the user/project later
-      client_reference_id: userId || undefined,
-      metadata: { campaign, source: 'donate_page', userId: userId || '' },
-
+      metadata: { campaign, source: 'donate_page' },
       ...(customer ? { customer } : {}),
-      ...(customer_email ? { customer_email } : {}),
-      // For subscriptions, carry userId/campaign on the subscription too
-      ...(isMonthly
-        ? {
-            subscription_data: {
-              metadata: { campaign, userId: userId || '' },
-            },
-          }
-        : {}),
+      ...(!customer && prefillEmail ? { customer_email: prefillEmail } : {}),
+    }
+
+    if (isMonthly) {
+      // Attach campaign to the subscription itself for reliable attribution later
+      ;(params as any).subscription_data = {
+        metadata: { campaign },
+      }
     }
 
     const session = await stripe.checkout.sessions.create(params)

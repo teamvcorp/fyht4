@@ -1,8 +1,8 @@
 // src/app/projects/[id]/page.tsx
 import { notFound } from 'next/navigation'
 import { type Metadata } from 'next'
-import { ObjectId } from 'mongodb'
-import mongoose from 'mongoose'
+import { ObjectId as MongoObjectId } from 'mongodb'
+import mongoose, { Types } from 'mongoose'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import dbConnect from '@/lib/mongoose'
@@ -18,6 +18,9 @@ import ProjectGrid from '@/components/dashboard/ProjectGrid'
 
 export const dynamic = 'force-dynamic'
 
+// A clean, plain-object type for lean() results
+type ProjectLean = Omit<IProject, keyof mongoose.Document> & { _id: Types.ObjectId }
+
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
@@ -26,12 +29,12 @@ export async function generateMetadata(
 
   await dbConnect()
 
-  let project: (IProject & { _id: ObjectId }) | null = null
-  if (ObjectId.isValid(id)) {
-    project = await Project.findById(id).lean()
+  let project: ProjectLean | null = null
+  if (MongoObjectId.isValid(id)) {
+    project = await Project.findById(id).lean<ProjectLean>()
   }
   if (!project) {
-    project = await Project.findOne({ slug: id }).lean()
+    project = await Project.findOne({ slug: id }).lean<ProjectLean>()
   }
   if (!project) return { title: 'Project not found' }
 
@@ -56,12 +59,12 @@ export default async function ProjectPage(
   await dbConnect()
 
   // Load project (by ObjectId, then slug)
-  let project = null as (IProject & { _id: ObjectId }) | null
-  if (ObjectId.isValid(id)) {
-    project = await Project.findById(id).lean()
+  let project: ProjectLean | null = null
+  if (MongoObjectId.isValid(id)) {
+    project = await Project.findById(id).lean<ProjectLean>()
   }
   if (!project) {
-    project = await Project.findOne({ slug: id }).lean()
+    project = await Project.findOne({ slug: id }).lean<ProjectLean>()
   }
   if (!project) notFound()
 
@@ -72,8 +75,9 @@ export default async function ProjectPage(
       const entry = await mongoose.connection
         .collection('watchlist') // keep your existing collection name
         .findOne({
-          userId: new ObjectId(session.user.id),
-          projectId: project._id,
+          userId: new MongoObjectId(session.user.id),
+          // convert the Mongoose ObjectId to native for this raw query
+          projectId: new MongoObjectId(String(project._id)),
         })
       isWatching = !!entry
     } catch {
@@ -82,17 +86,16 @@ export default async function ProjectPage(
   }
 
   // Related by ZIP (optional)
-  const relatedRaw =
-    project.zipcode
-      ? await Project.find({
-          zipcode: String(project.zipcode),
-          _id: { $ne: project._id },
-        })
-          .select('title category zipcode shortDescription coverImage status createdAt')
-          .sort({ createdAt: -1 })
-          .limit(6)
-          .lean()
-      : []
+  const relatedRaw = project.zipcode
+    ? await Project.find({
+        zipcode: String(project.zipcode),
+        _id: { $ne: project._id },
+      })
+        .select('title category zipcode shortDescription coverImage status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .lean<ProjectLean[]>()
+    : []
 
   // JSON-safe for client components
   const projectPlain = serializeDoc(project)
