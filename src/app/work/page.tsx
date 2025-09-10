@@ -25,7 +25,7 @@ function CaseStudies({
     <Container className="mt-40">
       <FadeIn>
         <h2 className="font-display text-2xl font-semibold text-neutral-950">
-          Current Projects
+          Partner Projects
         </h2>
       </FadeIn>
       <div className="mt-10 space-y-20 sm:space-y-24 lg:space-y-32">
@@ -129,7 +129,7 @@ function Clients() {
 }
 
 export const metadata: Metadata = {
-  title: 'Our Work',
+  title: 'Our Partners',
   description:
     'We believe in efficiency and maximizing our resources to provide the best value to our clients.',
 }
@@ -140,7 +140,7 @@ export default async function Work() {
   return (
     <RootLayout>
       <PageIntro
-        eyebrow="Our work"
+        eyebrow="Our Partners"
         title="Proven solutions for real-world problems."
       >
         <p>

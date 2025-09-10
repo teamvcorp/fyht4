@@ -5,7 +5,7 @@ import { MongoDBAdapter } from '@next-auth/mongodb-adapter'
 import clientPromise from '@/lib/mongodb'
 import { Resend } from 'resend'
 import User from '@/models/User'
-import type { UserRole, Zipcode } from '@/types/user'
+import dbConnect from '@/lib/mongoose'
 
 if (!process.env.GOOGLE_CLIENT_ID) throw new Error('Missing GOOGLE_CLIENT_ID')
 if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error('Missing GOOGLE_CLIENT_SECRET')
@@ -24,7 +24,15 @@ function magicLinkEmailHtml(url: string, host: string) {
     <p style="color:#6b7280;font-size:12px">FYHT4 • ${host}</p>
   </div>`
 }
-
+function computeIsSubscriber(user: { activeSubscription?: any | null }) {
+  const sub = user?.activeSubscription
+  if (!sub) return false
+  if (sub.interval !== 'month') return false
+  const ok = new Set(['trialing', 'active', 'past_due'])
+  if (!ok.has(sub.status)) return false
+  if (!sub.currentPeriodEnd) return false
+  return new Date(sub.currentPeriodEnd).getTime() > Date.now()
+}
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
   session: { strategy: 'jwt' },
@@ -62,7 +70,24 @@ export const authOptions: NextAuthOptions = {
       } else if (!(token as any).id && token?.sub) {
         (token as any).id = token.sub
       }
+      if (user && !(token as any).id) (token as any).id = (user as any)?.id ?? token.sub
 
+      // enrich with sub snapshot when missing or on fresh user
+      if (user || (token as any).isSubscriber === undefined) {
+        try {
+          await dbConnect()
+          const doc = await User.findById((token as any).id ?? token.sub)
+            .select('activeSubscription role zipcode')
+            .lean()
+            ; (token as any).role = doc?.role || 'user'
+            ; (token as any).zipcode = doc?.zipcode ?? null
+            ; (token as any).isSubscriber = computeIsSubscriber(doc || {})
+        } catch {
+          ; (token as any).role = (token as any).role || 'user'
+            ; (token as any).zipcode = (token as any).zipcode ?? null
+            ; (token as any).isSubscriber = false
+        }
+      }
       // Enrich with role/zipcode when signing in or when missing
       if (user || !(token as any).role) {
         try {
@@ -76,36 +101,30 @@ export const authOptions: NextAuthOptions = {
             const doc = await User.findById(userId)
               .select('role zipcode')
               .lean()
-            ;(token as any).role = doc?.role || 'user'
-            ;(token as any).zipcode = doc?.zipcode  ?? null
+              ; (token as any).role = doc?.role || 'user'
+              ; (token as any).zipcode = doc?.zipcode ?? null
           } else {
-            ;(token as any).role = (token as any).role || 'user'
-            ;(token as any).zipcode = (token as any).zipcode ?? null
+            ; (token as any).role = (token as any).role || 'user'
+              ; (token as any).zipcode = (token as any).zipcode ?? null
           }
         } catch {
-          ;(token as any).role = (token as any).role || 'user'
-          ;(token as any).zipcode = (token as any).zipcode ?? null
+          ; (token as any).role = (token as any).role || 'user'
+            ; (token as any).zipcode = (token as any).zipcode ?? null
         }
       }
 
       return token
     },
 
-    async session({ session, token }) {
-      const id =
-        (token as any)?.id ??
-        token?.sub ??
-        (session.user as any)?.id
-
-      if (session.user && id) {
-        (session.user as any).id = id
-      }
-      if (session.user) {
-        ;(session.user as any).role = (token as any)?.role || 'user'
-        ;(session.user as any).zipcode = (token as any)?.zipcode ?? null
-      }
-      return session
-    },
+     async session({ session, token }) {
+    if (session.user) {
+      ;(session.user as any).id = (token as any)?.id ?? token.sub
+      ;(session.user as any).role = (token as any)?.role || 'user'
+      ;(session.user as any).zipcode = (token as any)?.zipcode ?? null
+      ;(session.user as any).isSubscriber = !!(token as any)?.isSubscriber
+    }
+    return session
+  },
   }, // <-- this was missing in your snippet
 
   events: {

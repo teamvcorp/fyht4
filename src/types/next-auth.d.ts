@@ -1,27 +1,23 @@
 // src/types/next-auth.d.ts
-import type { DefaultSession, DefaultUser } from 'next-auth'
-import type { UserRole, Zipcode } from '@/types/user'
+import { DefaultSession } from 'next-auth'
 
 declare module 'next-auth' {
   interface Session {
     user: {
       id: string
-      role: UserRole
-      zipcode: Zipcode | null
+      role?: 'user' | 'admin'
+      zipcode?: string | null
+      isSubscriber?: boolean
     } & DefaultSession['user']
-  }
-
-  interface User extends DefaultUser {
-    role?: UserRole
-    zipcode?: Zipcode | null
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
     id?: string
-    role?: UserRole
-    zipcode?: Zipcode | null
+    role?: 'user' | 'admin'
+    zipcode?: string | null
+    isSubscriber?: boolean
   }
 }
 

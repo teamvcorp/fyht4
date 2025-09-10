@@ -9,10 +9,11 @@ const navigation = [
   {
     title: 'Work',
     links: [
-      { title: 'Empower', href: '/work/empower' },
-      { title: 'FYHT4', href: '/work/fyht4' },
+     
+      { title: 'FYHT4', href: '/work/fyht' },
       { title: 'Housing', href: '/work/housing' },
-      { title: 'Alley Burger', href: '/work/alley' },
+      { title: 'Taekwondo', href: '/work/taekwondo' },
+      
       {
         title: (
           <>
@@ -79,32 +80,83 @@ function ArrowIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   )
 }
 
+async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  e.preventDefault();
+
+  const form = e.currentTarget;                 // the <form>
+  const fd = new FormData(form);                // read all fields by name
+
+  const email = (fd.get('email') as string)?.trim();
+  const firstName = (fd.get('firstName') as string)?.trim() || undefined;
+  const lastName  = (fd.get('lastName') as string)?.trim() || undefined;
+  const newsletter = !!fd.get('newsletter');    // checkbox → boolean
+
+  if (!email) {
+    alert('Please enter your email.');
+    return;
+  }
+
+  // Send as multipart/form-data (browser sets headers automatically)
+  const res = await fetch('/api/newsletter/subscribe', {
+    method: 'POST',
+    body: fd,
+  });
+
+  if (res.ok) {
+    form.reset(); // optional: clear fields
+    alert('Thanks! You’re subscribed.');
+  } else {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'Subscription failed.');
+  }
+}
+
 function NewsletterForm() {
   return (
-    <form className="max-w-sm">
+    <form
+      className="max-w-sm"
+      onSubmit={handleSubmit}
+    >
       <h2 className="font-display text-sm font-semibold tracking-wider text-neutral-950">
         Sign up for our newsletter
       </h2>
-      <p className="mt-4 text-sm text-neutral-700">
-        Subscribe to get the latest design news, articles, resources and
-        inspiration.
-      </p>
-      <div className="relative mt-6">
+    
+      <div className="relative mt-6 space-y-4">
         <input
-          type="email"
-          placeholder="Email address"
-          autoComplete="email"
-          aria-label="Email address"
-          className="block w-full rounded-2xl border border-neutral-300 bg-transparent py-4 pr-20 pl-6 text-base/6 text-neutral-950 ring-4 ring-transparent transition placeholder:text-neutral-500 focus:border-neutral-950 focus:ring-neutral-950/5 focus:outline-hidden"
+          type="text"
+          name="firstName"
+          placeholder="First name"
+          autoComplete="given-name"
+          aria-label="First name"
+          className="block w-full rounded-2xl border border-neutral-300 bg-transparent py-4 pr-6 pl-6 text-base/6 text-neutral-950 ring-4 ring-transparent transition placeholder:text-neutral-500 focus:border-neutral-950 focus:ring-neutral-950/5 focus:outline-hidden"
         />
-        <div className="absolute inset-y-1 right-1 flex justify-end">
-          <button
-            type="submit"
-            aria-label="Submit"
-            className="flex aspect-square h-full items-center justify-center rounded-xl bg-neutral-950 text-white transition hover:bg-neutral-800"
-          >
-            <ArrowIcon className="w-4" />
-          </button>
+        <input
+          type="text"
+          name="lastName"
+          placeholder="Last name"
+          autoComplete="family-name"
+          aria-label="Last name"
+          className="block w-full rounded-2xl border border-neutral-300 bg-transparent py-4 pr-6 pl-6 text-base/6 text-neutral-950 ring-4 ring-transparent transition placeholder:text-neutral-500 focus:border-neutral-950 focus:ring-neutral-950/5 focus:outline-hidden"
+        />
+        <div className="relative">
+          <input
+            type="email"
+            name="email"
+            placeholder="Email address"
+            autoComplete="email"
+            aria-label="Email address"
+            className="block w-full rounded-2xl border border-neutral-300 bg-transparent py-4 pr-20 pl-6 text-base/6 text-neutral-950 ring-4 ring-transparent transition placeholder:text-neutral-500 focus:border-neutral-950 focus:ring-neutral-950/5 focus:outline-hidden"
+            required
+          />
+          <div className="absolute inset-y-1 right-1 flex justify-end">
+            <button
+              type="submit"
+              aria-label="Submit"
+              className="flex aspect-square h-full items-center justify-center rounded-xl bg-neutral-950 text-white transition hover:bg-neutral-800"
+            >
+              <ArrowIcon className="w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </form>

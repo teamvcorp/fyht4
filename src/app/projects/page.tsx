@@ -45,7 +45,7 @@ export const dynamic = 'force-dynamic'
 export default async function ProjectsPage({
   searchParams,
 }: {
-  // ✅ Next.js 15 passes searchParams as a Promise
+  // Next.js 15 passes searchParams as a Promise
   searchParams: Promise<{ sort?: string | string[]; q?: string | string[] }>
 }) {
   const { sort: sortParam, q: qParam } = await searchParams
@@ -58,6 +58,23 @@ export default async function ProjectsPage({
   const session = await getServerSession(authOptions)
   const db = (await clientPromise).db()
   const projectsCol = db.collection<Project>('projects')
+
+  // ----- Determine subscription gate -----
+  const isMember = !!session?.user?.id
+
+  // Prefer value from session (set by your auth callbacks/webhook).
+  // If missing, fall back to DB user fields.
+  let canSubmit = Boolean((session?.user as any)?.hasActiveSubscription)
+  if (isMember && !canSubmit) {
+    const u = await db.collection('users').findOne(
+      { _id: new ObjectId(session!.user!.id) },
+      { projection: { hasActiveSubscription: 1, stripeSubscriptionStatus: 1 } }
+    )
+    canSubmit =
+      Boolean(u?.hasActiveSubscription) ||
+      ['active', 'trialing'].includes(String(u?.stripeSubscriptionStatus || ''))
+  }
+  // --------------------------------------
 
   const filter: Filter<Project> = {}
   if (q) {
@@ -95,12 +112,38 @@ export default async function ProjectsPage({
     Omit<Project, '_id' | 'createdAt'> & { _id: string; createdAt?: string }
   >
 
-  const isMember = !!session?.user?.id
-
   return (
     <RootLayout>
       <PageIntro eyebrow="Projects" title="Explore and take action">
         <p>Sort by location, then watch, vote, or donate to the projects you care about.</p>
+
+        {/* Conditional proposal button / upsell */}
+        {isMember ? (
+          canSubmit ? (
+            <div className="mt-6">
+              <a
+                href="/projects/submit"
+                className="inline-flex items-center rounded-2xl bg-emerald-600 px-5 py-2.5 text-white font-semibold hover:bg-emerald-700 transition"
+              >
+                Submit a proposal
+              </a>
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-neutral-600">
+              Want to submit a proposal? Become a monthly supporter first.&nbsp;
+              <a href="/donate?frequency=monthly" className="underline hover:text-neutral-900">
+                Start a monthly membership →
+              </a>
+            </p>
+          )
+        ) : (
+          <p className="mt-6 text-sm text-neutral-600">
+            Sign in and become a monthly supporter to submit proposals.&nbsp;
+            <a href="/membership" className="underline hover:text-neutral-900">
+              Sign in →
+            </a>
+          </p>
+        )}
       </PageIntro>
 
       <Container className="mt-6 sm:mt-10">

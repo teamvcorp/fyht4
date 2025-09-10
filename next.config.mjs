@@ -20,7 +20,7 @@ const nextConfig = {
       // optional common hosts if you use them:
       { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
       { protocol: 'https', hostname: 'pbs.twimg.com' },
-      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
     ],
   },
 }
