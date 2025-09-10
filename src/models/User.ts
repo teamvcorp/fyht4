@@ -1,89 +1,98 @@
 // src/models/User.ts
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, type Document, type Model } from 'mongoose'
 
-export type UserRole = 'user' | 'admin';
+/** --- Small literal enums (keeps TS happy) --- */
+export const SUB_STATUSES = [
+  'trialing',
+  'active',
+  'past_due',
+  'canceled',
+  'incomplete',
+  'incomplete_expired',
+  'unpaid',
+] as const
+export type SubStatus = typeof SUB_STATUSES[number]
 
+export const INTERVALS = ['day', 'week', 'month', 'year'] as const
+export type Interval = typeof INTERVALS[number] | null
+
+/** --- Nested subscription snapshot --- */
 export interface IActiveSubscription {
-  id: string;                       // Stripe subscription id (sub_*)
-  status:
-    | 'incomplete'
-    | 'incomplete_expired'
-    | 'trialing'
-    | 'active'
-    | 'past_due'
-    | 'canceled'
-    | 'unpaid'
-    | 'paused';
-  interval: 'month' | 'year' | null;
-  amount: number | null;            // unit_amount in cents
-  currency: string | null;          // lowercase (e.g. 'usd')
-  currentPeriodEnd: Date | null;    // renewal boundary from Stripe
-  cancelAtPeriodEnd: boolean;
-  customerId: string;               // Stripe customer id (cus_*)
-  priceId?: string | null;
-  productId?: string | null;
+  id: string
+  status: SubStatus
+  interval: Interval
+  amount: number | null // cents
+  currency: string | null
+  currentPeriodEnd: Date | null
+  cancelAtPeriodEnd: boolean
+  customerId: string
+  priceId: string | null
+  productId: string | null
 }
 
+/** --- User document --- */
 export interface IUser extends Document {
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  role: UserRole;
-  zipcode?: string | null;
+  name?: string | null
+  email?: string | null
+  emailVerified?: Date | null
+  image?: string | null
 
-  stripeCustomerId?: string | null;
-  activeSubscription?: IActiveSubscription | null;
-  lastPaidAt?: Date | null;
+  role: 'user' | 'admin'
+  zipcode?: string | null
 
-  createdAt: Date;
-  updatedAt: Date;
+  stripeCustomerId?: string | null
+  activeSubscription?: IActiveSubscription | null
+  lastPaidAt?: Date | null
+
+  createdAt?: Date
+  updatedAt?: Date
 }
 
-const ActiveSubscriptionSchema = new Schema<IActiveSubscription>(
+/**
+ * IMPORTANT: don’t pass a generic to the subdocument schema.
+ * That’s what triggers the “union type too complex to represent” error.
+ */
+const ActiveSubscriptionSchema = new Schema(
   {
     id: { type: String, required: true },
-    status: {
-      type: String,
-      enum: [
-        'incomplete',
-        'incomplete_expired',
-        'trialing',
-        'active',
-        'past_due',
-        'canceled',
-        'unpaid',
-        'paused',
-      ],
-      required: true,
-    },
-    interval: { type: String, enum: ['month', 'year', null], default: null },
+    status: { type: String, enum: SUB_STATUSES, required: true },
+    interval: { type: String, enum: INTERVALS, default: null }, // allow null; not required
     amount: { type: Number, default: null },
     currency: { type: String, default: null },
     currentPeriodEnd: { type: Date, default: null },
     cancelAtPeriodEnd: { type: Boolean, default: false },
-    customerId: { type: String, required: true },
+    customerId: { type: String, required: true, index: true },
     priceId: { type: String, default: null },
     productId: { type: String, default: null },
   },
   { _id: false }
-);
+)
 
 const UserSchema = new Schema<IUser>(
   {
-    name: String,
-    email: { type: String, index: true }, // DO NOT set `unique` here to avoid duplicate-index warnings with NextAuth adapter
-    image: String,
+    name: { type: String },
+    email: { type: String, lowercase: true, trim: true, unique: true, sparse: true, index: true },
+    emailVerified: { type: Date, default: null },
+    image: { type: String, default: null },
+
     role: { type: String, enum: ['user', 'admin'], default: 'user', index: true },
     zipcode: { type: String, default: null },
 
-    stripeCustomerId: { type: String, default: undefined },
+    stripeCustomerId: { type: String, index: true, sparse: true },
     activeSubscription: { type: ActiveSubscriptionSchema, default: null },
     lastPaidAt: { type: Date, default: null },
   },
   { timestamps: true }
-);
+)
 
-// Keep a unique sparse index only for customerId (users can be created without Stripe at first)
-UserSchema.index({ stripeCustomerId: 1 }, { unique: true, partialFilterExpression: { stripeCustomerId: { $type: 'string' } }, });
+// Optional: normalize emails to lowercase
+UserSchema.pre('save', function (next) {
+  if (this.email) this.email = this.email.toLowerCase()
+  next()
+})
 
-export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+const UserModel: Model<IUser> =
+  (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', UserSchema)
+
+export default UserModel
+export type { IUser as UserDocument, IActiveSubscription }
