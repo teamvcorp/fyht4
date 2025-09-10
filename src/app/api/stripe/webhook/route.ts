@@ -2,8 +2,9 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import dbConnect from '@/lib/mongoose'
-import User, { IUser } from '@/models/User'
+import User from '@/models/User'
 import type { Types } from 'mongoose'
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +30,12 @@ function dual<T = any>(obj: any, snake: string, camel: string): T | null {
 function readPriceBasics(price: any) {
   const unitAmount = price?.unit_amount ?? price?.unitAmount ?? null
   const currency = price?.currency ?? null
-  const interval = price?.recurring?.interval ?? null // (same in both)
+  const interval = price?.recurring?.interval ?? null
   const priceId = price?.id ?? null
   const productId =
     typeof price?.product === 'string'
       ? (price?.product as string)
       : price?.product?.id ?? null
-
   return { unitAmount, currency, interval, priceId, productId }
 }
 
@@ -46,7 +46,6 @@ function normalizeSubscription(sub: Stripe.Subscription) {
   const cancelAtPeriodEnd =
     dual<boolean>(sub as any, 'cancel_at_period_end', 'cancelAtPeriodEnd') ?? false
 
-  // first item’s price (typical 1-price subscriptions)
   const firstItem = (sub.items?.data?.[0] as any) || null
   const price = firstItem?.price || null
   const { unitAmount, currency, interval, priceId, productId } = readPriceBasics(price)
@@ -66,63 +65,6 @@ function normalizeSubscription(sub: Stripe.Subscription) {
   }
 }
 
-async function upsertUserFromSubscription(sub: Stripe.Subscription) {
-  await dbConnect()
-  const snap = normalizeSubscription(sub)
-
-  // Single-doc shape for what we need
-  type UserIdOnly = { _id: Types.ObjectId }
-
-  // 🔧 Always get ONE doc here (findOne, not find)
-  let user: UserIdOnly | null = await User
-    .findOne({ stripeCustomerId: snap.customerId })
-    .select('_id')
-    .lean<UserIdOnly>()
-
-  if (!user) {
-    const metaUserId =
-      (sub.metadata?.userId as string | undefined) ??
-      (typeof (sub as any).metadata?.user_id === 'string' ? (sub as any).metadata.user_id : undefined)
-
-    if (metaUserId) {
-      // 🔧 Ensure this also returns ONE doc and typed as such
-      user = await User.findByIdAndUpdate(
-        metaUserId,
-        { $set: { stripeCustomerId: snap.customerId } },
-        { new: true, projection: { _id: 1 }, lean: true }
-      ) as UserIdOnly | null
-    }
-  }
-
-  if (!user?._id) return
-
-  const shouldClear =
-    sub.status === 'canceled' ||
-    sub.status === 'incomplete_expired' ||
-    sub.status === 'unpaid'
-
-  await User.updateOne(
-    { _id: user._id },
-    {
-      $set: {
-        activeSubscription: shouldClear
-          ? null
-          : {
-            id: sub.id,
-            status: snap.status,
-            interval: snap.interval,
-            amount: snap.amount,
-            currency: snap.currency,
-            currentPeriodEnd: snap.currentPeriodEnd,
-            cancelAtPeriodEnd: snap.cancelAtPeriodEnd,
-            customerId: snap.customerId,
-            priceId: snap.priceId,
-            productId: snap.productId,
-          },
-      },
-    }
-  )
-}
 function readInvoiceSubscriptionId(inv: any): string | null {
   const raw =
     inv?.subscription ??
@@ -131,6 +73,100 @@ function readInvoiceSubscriptionId(inv: any): string | null {
     null
   if (!raw) return null
   return typeof raw === 'string' ? raw : raw?.id ?? null
+}
+
+/** Find (and optionally link) a user given several hints */
+async function resolveUserId({
+  metaUserId,
+  customerId,
+  email,
+}: {
+  metaUserId?: string
+  customerId?: string | null
+  email?: string | null
+}): Promise<Types.ObjectId | null> {
+  await dbConnect()
+
+  // 1) If we already have a user with this customerId, use it.
+  if (customerId) {
+    const byCust = await User.findOne({ stripeCustomerId: customerId }).select('_id').lean<{ _id: Types.ObjectId } | null>()
+    if (byCust?._id) return byCust._id
+  }
+
+  // 2) Prefer explicit user id from metadata/client_reference_id; also link stripeCustomerId.
+  if (metaUserId) {
+    const updated = await User.findByIdAndUpdate(
+      metaUserId,
+      customerId ? { $set: { stripeCustomerId: customerId } } : {},
+      { new: true, projection: { _id: 1 }, lean: true }
+    )
+    if (updated?._id) return updated._id as Types.ObjectId
+  }
+
+  // 3) Fall back to email if present; also link stripeCustomerId.
+  if (email) {
+    const byEmail = await User.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      customerId ? { $set: { stripeCustomerId: customerId } } : {},
+      { new: true, projection: { _id: 1 }, lean: true }
+    )
+    if (byEmail?._id) return byEmail._id as Types.ObjectId
+  }
+
+  return null
+}
+
+async function upsertUserFromSubscription(sub: Stripe.Subscription, session?: Stripe.Checkout.Session) {
+  const snap = normalizeSubscription(sub)
+
+  const metaUserId =
+    (sub.metadata?.userId as string | undefined) ||
+    (session?.client_reference_id as string | undefined)
+
+  const emailFromSession = session?.customer_details?.email ?? null
+
+  const userId = await resolveUserId({
+    metaUserId,
+    customerId: snap.customerId,
+    email: emailFromSession,
+  })
+  if (!userId) {
+    console.warn('[stripe webhook] No matching user for subscription', sub.id, {
+      metaUserId,
+      customerId: snap.customerId,
+      emailFromSession,
+    })
+    return
+  }
+
+  const shouldClear =
+    sub.status === 'canceled' ||
+    sub.status === 'incomplete_expired' ||
+    sub.status === 'unpaid'
+
+  await dbConnect()
+  await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        stripeCustomerId: snap.customerId,
+        activeSubscription: shouldClear
+          ? null
+          : {
+              id: sub.id,
+              status: snap.status,
+              interval: snap.interval,
+              amount: snap.amount,
+              currency: snap.currency,
+              currentPeriodEnd: snap.currentPeriodEnd,
+              cancelAtPeriodEnd: snap.cancelAtPeriodEnd,
+              customerId: snap.customerId,
+              priceId: snap.priceId,
+              productId: snap.productId,
+            },
+      },
+    }
+  )
 }
 
 export async function POST(req: Request) {
@@ -150,43 +186,49 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
+      /**
+       * ————————————————————————————————————————————————————————————————
+       * checkout.session.completed
+       * - Link stripeCustomerId to the user
+       * - If subscription checkout, pull Subscription and snapshot it
+       * ————————————————————————————————————————————————————————————————
+       */
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const customerId = typeof session.customer === 'string'
-          ? session.customer
-          : session.customer?.id
 
-        // Prefer explicit user id from metadata or client_reference_id
-        const metaUserId = (session.metadata?.userId as string | undefined)
-          || (session.client_reference_id as string | undefined)
+        const customerId =
+          (typeof session.customer === 'string'
+            ? session.customer
+            : session.customer?.id) || null
 
-        if (customerId && metaUserId) {
+        const metaUserId =
+          (session.metadata?.userId as string | undefined) ||
+          (session.client_reference_id as string | undefined)
+
+        const email = session.customer_details?.email ?? null
+
+        const userId = await resolveUserId({ metaUserId, customerId, email })
+
+        // If it was a subscription checkout, snapshot now
+        if (session.mode === 'subscription' && typeof session.subscription === 'string') {
+          const sub = await stripe.subscriptions.retrieve(session.subscription, {
+            expand: ['items.data.price.product', 'customer'],
+          })
+          await upsertUserFromSubscription(sub, session)
+        } else if (userId && customerId) {
+          // One-time payment checkout: still link customer & mark lastPaidAt now
           await dbConnect()
           await User.updateOne(
-            { _id: metaUserId },
-            { $set: { stripeCustomerId: customerId } }
+            { _id: userId },
+            { $set: { stripeCustomerId: customerId, lastPaidAt: new Date() } }
           )
         }
-
-        // If it's a subscription flow, you can still retrieve the subscription
-        // and run your existing upsert/subscription snapshot logic afterward.
-        // ...
         break
       }
 
-      // After Checkout for subscriptions, prime activeSubscription
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        if (session.mode !== 'subscription') break
-        const subId = (session.subscription as string) || undefined
-        if (!subId) break
-
-        const sub = await stripe.subscriptions.retrieve(subId)
-        await upsertUserFromSubscription(sub)
-        break
-      }
-
-      // Keep user snapshot in sync with subscription lifecycle
+      /**
+       * Subscription lifecycle → keep activeSubscription in sync
+       */
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
@@ -195,26 +237,29 @@ export async function POST(req: Request) {
         break
       }
 
-      // Mark lastPaidAt and refresh current period on payment
+      /**
+       * Invoice paid (classic and alt names) → refresh lastPaidAt and snapshot
+       */
+      case 'invoice.payment_succeeded':
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
         const customerId =
-          typeof invoice.customer === 'string'
+          (typeof invoice.customer === 'string'
             ? invoice.customer
-            : invoice.customer?.id
+            : invoice.customer?.id) || null
         if (!customerId) break
 
         await dbConnect()
-
-        await User.findOneAndUpdate(
+        await User.updateOne(
           { stripeCustomerId: customerId },
           { $set: { lastPaidAt: new Date((invoice.created as number) * 1000) } }
         )
 
-        // Refresh subscription snapshot if invoice ties to a subscription
         const subId = readInvoiceSubscriptionId(invoice as any)
         if (subId) {
-          const sub = await stripe.subscriptions.retrieve(subId)
+          const sub = await stripe.subscriptions.retrieve(subId, {
+            expand: ['items.data.price.product', 'customer'],
+          })
           await upsertUserFromSubscription(sub)
         }
         break

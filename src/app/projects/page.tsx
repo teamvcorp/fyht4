@@ -15,6 +15,16 @@ import WatchButton from '@/components/projects/WatchButton'
 import VoteButtons from '@/components/projects/VoteButtons'
 import DonateNowButton from '@/components/projects/DonateNowButton'
 
+
+type SessionUser = {
+  id?: string
+  email?: string | null
+  // If you already inject a snapshot into the session, this will be used first.
+  activeSubscription?: { status?: string; currentPeriodEnd?: string | Date | null }
+  hasActiveSubscription?: boolean // legacy; still honored if present
+}
+
+
 type ProjectStatus = 'voting' | 'funding' | 'build' | 'completed'
 type Project = {
   _id: ObjectId
@@ -60,22 +70,54 @@ export default async function ProjectsPage({
   const db = (await clientPromise).db()
   const projectsCol = db.collection<Project>('projects')
 
-  // ----- Determine subscription gate -----
-  const isMember = !!session?.user?.id
+const isMember = !!session?.user?.id
 
-  // Prefer value from session (set by your auth callbacks/webhook).
-  // If missing, fall back to DB user fields.
-  let canSubmit = Boolean((session?.user as any)?.hasActiveSubscription)
-  if (isMember && !canSubmit) {
+// 1) Prefer what we already know on the session (keeps page fast)
+const sUser = session?.user as SessionUser | undefined
+let canSubmit =
+  Boolean(sUser?.hasActiveSubscription) || // legacy flag if you still set it
+  ['active', 'trialing'].includes(String(sUser?.activeSubscription?.status || ''))
+
+// 2) Fallback: read from DB
+if (isMember && !canSubmit) {
+  // Safely resolve the user doc even if the session id isn't a Mongo ObjectId
+  const selector =
+    (sUser?.id && ObjectId.isValid(String(sUser.id)))
+      ? { _id: new ObjectId(String(sUser.id)) }
+      : (sUser?.email ? { email: sUser.email.toLowerCase() } : null)
+
+  if (selector) {
     const u = await db.collection('users').findOne(
-      { _id: new ObjectId(session!.user!.id) },
-      { projection: { hasActiveSubscription: 1, stripeSubscriptionStatus: 1 } }
+      selector,
+      {
+        projection: {
+          'activeSubscription.status': 1,
+          'activeSubscription.currentPeriodEnd': 1,
+          'activeSubscription.cancelAtPeriodEnd': 1,
+        },
+      }
     )
-    canSubmit =
-      Boolean(u?.hasActiveSubscription) ||
-      ['active', 'trialing'].includes(String(u?.stripeSubscriptionStatus || ''))
+
+    const status = u?.activeSubscription?.status as
+      | 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid'
+      | undefined
+
+    // Treat only active/trialing as “can submit” (mirrors your old logic)
+    canSubmit = status === 'active' || status === 'trialing'
+
+    // Optional: also ensure the period hasn’t already ended
+    if (canSubmit && u?.activeSubscription?.currentPeriodEnd) {
+      const end = new Date(u.activeSubscription.currentPeriodEnd)
+      if (Number.isFinite(+end) && end < new Date()) {
+        canSubmit = false
+      }
+    }
+  } else {
+    // No valid selector; safest default is false
+    canSubmit = false
   }
-  // --------------------------------------
+}
+
 
   const filter: Filter<Project> = {}
   if (q) {
