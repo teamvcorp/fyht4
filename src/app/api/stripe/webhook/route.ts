@@ -2,65 +2,135 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import dbConnect from '@/lib/mongoose'
-import User from '@/models/User'
-
+import User, { IUser } from '@/models/User'
+import type { Types } from 'mongoose'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, { apiVersion: '2025-08-27.basil' })
+const stripe = new Stripe(process.env.NEXT_AUTH_STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-08-27.basil',
+})
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!
 
+/** Convert unix seconds to Date or null */
 function toDateOrNull(ts?: number | null) {
   return ts ? new Date(ts * 1000) : null
 }
 
-async function upsertUserFromSubscription(sub: Stripe.Subscription) {
-  await dbConnect()
+/** Read a field that may be snake_case (classic) or camelCase (basil) */
+function dual<T = any>(obj: any, snake: string, camel: string): T | null {
+  if (!obj) return null
+  if (obj[snake] !== undefined) return obj[snake] as T
+  if (obj[camel] !== undefined) return obj[camel] as T
+  return null
+}
+
+/** Get a value from price that may differ across API versions */
+function readPriceBasics(price: any) {
+  const unitAmount = price?.unit_amount ?? price?.unitAmount ?? null
+  const currency = price?.currency ?? null
+  const interval = price?.recurring?.interval ?? null // (same in both)
+  const priceId = price?.id ?? null
+  const productId =
+    typeof price?.product === 'string'
+      ? (price?.product as string)
+      : price?.product?.id ?? null
+
+  return { unitAmount, currency, interval, priceId, productId }
+}
+
+/** Normalize subscription core fields for our snapshot */
+function normalizeSubscription(sub: Stripe.Subscription) {
+  const currentPeriodEnd =
+    dual<number>(sub as any, 'current_period_end', 'currentPeriodEnd') ?? null
+  const cancelAtPeriodEnd =
+    dual<boolean>(sub as any, 'cancel_at_period_end', 'cancelAtPeriodEnd') ?? false
+
+  // first item’s price (typical 1-price subscriptions)
+  const firstItem = (sub.items?.data?.[0] as any) || null
+  const price = firstItem?.price || null
+  const { unitAmount, currency, interval, priceId, productId } = readPriceBasics(price)
 
   const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
-  const price = sub.items.data[0]?.price
-  const interval = price?.recurring?.interval ?? null
-  const amount = price?.unit_amount ?? null
-  const currency = price?.currency ?? null
 
-  const snapshot = {
-    id: sub.id,
-    status: sub.status,
-    interval: (interval as 'month' | 'year' | null) ?? null,
-    amount: amount ?? null,
-    currency: currency ?? null,
-    currentPeriodEnd: toDateOrNull(sub.current_period_end),
-    cancelAtPeriodEnd: !!sub.cancel_at_period_end,
+  return {
     customerId,
-    priceId: price?.id ?? null,
-    productId:
-      typeof price?.product === 'string'
-        ? (price?.product as string)
-        : (price?.product as any)?.id ?? null,
+    status: sub.status,
+    interval: (interval as 'day' | 'week' | 'month' | 'year' | null) ?? null,
+    amount: unitAmount ?? null,
+    currency: currency ?? null,
+    currentPeriodEnd: toDateOrNull(currentPeriodEnd),
+    cancelAtPeriodEnd: !!cancelAtPeriodEnd,
+    priceId,
+    productId,
   }
+}
 
-  // Prefer matching by customerId; if not found and userId metadata present, update that user.
-  let user = await User.findOne({ stripeCustomerId: customerId }).select('_id').lean()
+async function upsertUserFromSubscription(sub: Stripe.Subscription) {
+  await dbConnect()
+  const snap = normalizeSubscription(sub)
+
+  // Single-doc shape for what we need
+  type UserIdOnly = { _id: Types.ObjectId }
+
+  // 🔧 Always get ONE doc here (findOne, not find)
+  let user: UserIdOnly | null = await User
+    .findOne({ stripeCustomerId: snap.customerId })
+    .select('_id')
+    .lean<UserIdOnly>()
+
   if (!user) {
-    const metaUserId = (sub.metadata?.userId as string) || undefined
+    const metaUserId =
+      (sub.metadata?.userId as string | undefined) ??
+      (typeof (sub as any).metadata?.user_id === 'string' ? (sub as any).metadata.user_id : undefined)
+
     if (metaUserId) {
+      // 🔧 Ensure this also returns ONE doc and typed as such
       user = await User.findByIdAndUpdate(
         metaUserId,
-        { $set: { stripeCustomerId: customerId } },
-        { new: true, lean: true }
-      )
+        { $set: { stripeCustomerId: snap.customerId } },
+        { new: true, projection: { _id: 1 }, lean: true }
+      ) as UserIdOnly | null
     }
   }
 
-  if (user) {
-    // Set/clear activeSubscription by status
-    const clear =
-      sub.status === 'canceled' || sub.status === 'incomplete_expired' || sub.status === 'unpaid'
-    await User.updateOne(
-      { _id: user._id },
-      { $set: { activeSubscription: clear ? null : snapshot } }
-    )
-  }
+  if (!user?._id) return
+
+  const shouldClear =
+    sub.status === 'canceled' ||
+    sub.status === 'incomplete_expired' ||
+    sub.status === 'unpaid'
+
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        activeSubscription: shouldClear
+          ? null
+          : {
+              id: sub.id,
+              status: snap.status,
+              interval: snap.interval,
+              amount: snap.amount,
+              currency: snap.currency,
+              currentPeriodEnd: snap.currentPeriodEnd,
+              cancelAtPeriodEnd: snap.cancelAtPeriodEnd,
+              customerId: snap.customerId,
+              priceId: snap.priceId,
+              productId: snap.productId,
+            },
+      },
+    }
+  )
+}
+function readInvoiceSubscriptionId(inv: any): string | null {
+  const raw =
+    inv?.subscription ??
+    inv?.subscriptionId ??
+    inv?.subscription_id ??
+    null
+  if (!raw) return null
+  return typeof raw === 'string' ? raw : raw?.id ?? null
 }
 
 export async function POST(req: Request) {
@@ -80,11 +150,10 @@ export async function POST(req: Request) {
 
   try {
     switch (event.type) {
-      // When Checkout completes for subscriptions, capture user/customer and prime activeSubscription
+      // After Checkout for subscriptions, prime activeSubscription
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         if (session.mode !== 'subscription') break
-
         const subId = (session.subscription as string) || undefined
         if (!subId) break
 
@@ -93,7 +162,7 @@ export async function POST(req: Request) {
         break
       }
 
-      // Keep subscription snapshot in sync (status/period changes)
+      // Keep user snapshot in sync with subscription lifecycle
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
@@ -102,26 +171,25 @@ export async function POST(req: Request) {
         break
       }
 
-      // Set lastPaidAt and ensure currentPeriodEnd is fresh
+      // Mark lastPaidAt and refresh current period on payment
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
         const customerId =
-          typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+          typeof invoice.customer === 'string'
+            ? invoice.customer
+            : invoice.customer?.id
         if (!customerId) break
 
         await dbConnect()
-        // Stamp lastPaidAt
+
         await User.findOneAndUpdate(
           { stripeCustomerId: customerId },
-          { $set: { lastPaidAt: new Date(invoice.created * 1000) } }
+          { $set: { lastPaidAt: new Date((invoice.created as number) * 1000) } }
         )
 
-        // If this invoice has a subscription, refresh the current period end
-        if (invoice.subscription) {
-          const subId =
-            typeof invoice.subscription === 'string'
-              ? invoice.subscription
-              : invoice.subscription.id
+        // Refresh subscription snapshot if invoice ties to a subscription
+        const subId = readInvoiceSubscriptionId(invoice as any)
+        if (subId) {
           const sub = await stripe.subscriptions.retrieve(subId)
           await upsertUserFromSubscription(sub)
         }
@@ -129,7 +197,7 @@ export async function POST(req: Request) {
       }
 
       default:
-        // ok to ignore others
+        // Ignore other events
         break
     }
 
