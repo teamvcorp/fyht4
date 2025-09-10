@@ -49,12 +49,12 @@ export async function generateMetadata(
   }
 }
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
+export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
   const db = (await clientPromise).db()
    await dbConnect()
 
-  const id = decodeURIComponent(params.id)
+  const id = decodeURIComponent((await params).id)
 
   // Fetch project by ObjectId or slug
   let project: any = null
