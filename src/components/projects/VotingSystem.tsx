@@ -41,11 +41,11 @@ export function VotingSystem({
   const [message, setMessage] = useState('')
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
 
-  // Check if user can vote
+  // Check if user can vote (allow during voting and funding phases)
   const canVote = session && 
     hasActiveSubscription && 
     userZipcode === projectZipcode && 
-    projectStatus === 'voting' &&
+    ['voting', 'funding'].includes(projectStatus) &&
     !userVote
 
   // Load user's existing vote
@@ -91,7 +91,7 @@ export function VotingSystem({
       return
     }
 
-    if (projectStatus !== 'voting') {
+    if (!['voting', 'funding'].includes(projectStatus)) {
       setMessage('Voting is not open for this project')
       return
     }
@@ -139,12 +139,12 @@ export function VotingSystem({
     return voteGoal > 0 ? Math.min((votesYes / voteGoal) * 100, 100) : 0
   }
 
-  if (projectStatus !== 'voting') {
+  if (!['voting', 'funding'].includes(projectStatus)) {
     return (
       <div className={`text-sm text-neutral-500 ${className}`}>
-        {projectStatus === 'funding' && 'Voting complete - Now funding'}
-        {projectStatus === 'active' && 'Project is active'}
+        {projectStatus === 'build' && 'Project is being built - voting closed'}
         {projectStatus === 'completed' && 'Project completed'}
+        {projectStatus === 'archived' && 'Project archived'}
         {projectStatus === 'draft' && 'Project in review'}
       </div>
     )
@@ -152,6 +152,20 @@ export function VotingSystem({
 
   return (
     <div className={`space-y-3 ${className}`}>
+      {/* Phase indicator */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className={`px-2 py-1 rounded-full text-white font-medium ${
+          projectStatus === 'voting' ? 'bg-blue-500' : 'bg-emerald-500'
+        }`}>
+          {projectStatus === 'voting' ? '🗳️ Voting Phase' : '💰 Funding Phase'}
+        </span>
+        {projectStatus === 'funding' && (
+          <span className="text-neutral-600">Vote and donate to support this project</span>
+        )}
+        {projectStatus === 'voting' && (
+          <span className="text-neutral-600">Community voting in progress</span>
+        )}
+      </div>
       {/* Vote Buttons */}
       <div className="flex items-center gap-2">
         {userVote ? (

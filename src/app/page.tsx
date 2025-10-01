@@ -16,6 +16,7 @@ import CRFCLogo from '@/images/clients/crossroad/crossroadLogo.png'
 import Fyht4LogoLite from '@/images/clients/fight/fightLogo.png'
 import imageFam from '@/images/fam.png'
 import { type CaseStudy, type MDXEntry, loadCaseStudies } from '@/lib/mdx'
+import { WalletFundingSection } from '@/components/WalletFundingSection'
 import { RootLayout } from '@/components/RootLayout'
 
 const clients = [
@@ -229,8 +230,7 @@ export default async function Home() {
         </FadeIn>
       </Container>
 
-
-
+      <WalletFundingSection />
 
       <CaseStudies caseStudies={caseStudies} />
 

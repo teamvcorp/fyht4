@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     try { return await req.json() } catch { return {} }
   })()
 
-  const { title, category, zipcode, shortDescription = '', description = '', fundingGoal, voteGoal } =
+  const { title, category, zipcode, city, state, shortDescription = '', description = '', fundingGoal, voteGoal } =
     body as Record<string, any>
 
   if (!title || !zipcode || fundingGoal == null || voteGoal == null) {
@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
     title: String(title).trim(),
     category: category ? String(category).trim() : 'General',
     zipcode: String(zipcode),
+    city: city ? String(city).trim() : null,
+    state: state ? String(state).trim() : null,
     shortDescription: String(shortDescription).trim(),
     description: String(description).trim(),
     fundingGoal: fundingCents,

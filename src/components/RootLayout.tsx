@@ -20,6 +20,7 @@ import { Container } from '@/components/Container'
 import { Footer } from '@/components/Footer'
 import { GridPattern } from '@/components/GridPattern'
 import { Logo } from '@/components/Logo'
+import { PendingDonationHandler } from '@/components/PendingDonationHandler'
 import { Offices } from '@/components/Offices'
 import { SocialMedia } from '@/components/SocialMedia'
 import { Session } from 'inspector'
@@ -398,6 +399,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <RootLayoutContext.Provider value={{ logoHovered, setLogoHovered }}>
+        <PendingDonationHandler />
         <RootLayoutInner key={pathname}>{children}</RootLayoutInner>
       </RootLayoutContext.Provider>
     </SessionProvider>

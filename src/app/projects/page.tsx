@@ -14,7 +14,7 @@ import ProjectsToolbar from '@/components/projects/ProjectsToolbar'
 import WatchButton from '@/components/projects/WatchButton'
 import VoteButtons from '@/components/projects/VoteButtons'
 import { VotingSystem } from '@/components/projects/VotingSystem'
-import DonateNowButton from '@/components/projects/DonateNowButton'
+import { QuickDonateButtons } from '@/components/projects/QuickDonateButtons'
 
 
 type SessionUser = {
@@ -300,7 +300,11 @@ if (isMember && !canSubmit) {
                             userZipcode={userZipcode}
                             hasActiveSubscription={canSubmit}
                           />
-                          <DonateNowButton projectId={p._id} projectTitle={p.title} />
+                          <QuickDonateButtons 
+                            projectId={p._id} 
+                            projectTitle={p.title}
+                            projectStatus={p.status}
+                          />
                         </>
                       ) : (
                         <a

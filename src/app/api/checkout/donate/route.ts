@@ -94,14 +94,7 @@ export async function GET(req: NextRequest) {
     const sessionResp = await stripe.checkout.sessions.create(params)
     return NextResponse.json({ url: sessionResp.url })
   } catch (err: any) {
-    console.error('Checkout error:', {
-      type: err?.type,
-      code: err?.code,
-      param: err?.param,
-      requestId: err?.requestId ?? err?.raw?.requestId,
-      message: err?.message,
-      rawMessage: err?.raw?.message,
-    })
+    console.error('Checkout error occurred')
     return NextResponse.json(
       { error: err?.raw?.message || err?.message || 'Unable to create checkout session' },
       { status: 500 }

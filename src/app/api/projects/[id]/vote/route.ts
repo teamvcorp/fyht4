@@ -19,14 +19,8 @@ export async function POST(
 
   // Get session first
   const session = await getServerSession(authOptions)
-  console.log('Vote API - Session check:', {
-    hasSession: !!session,
-    userId: session?.user?.id,
-    email: session?.user?.email
-  })
   
   if (!session?.user?.id) {
-    console.log('Vote API - No session found, returning 401')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -35,13 +29,6 @@ export async function POST(
   const user = await UserModel.findById(session.user.id)
     .select('role activeSubscription zipcode')
     .lean<Pick<IUser, '_id' | 'role' | 'activeSubscription' | 'zipcode'> | null>()
-
-  console.log('Vote API - User lookup:', {
-    userId: session.user.id,
-    foundUser: !!user,
-    userRole: user?.role,
-    hasActiveSubscription: user?.activeSubscription?.status
-  })
 
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -57,16 +44,7 @@ export async function POST(
 
   const isAdmin = user.role === 'admin'
 
-  console.log('Vote API - Subscription check:', {
-    hasActiveSubscription,
-    isAdmin,
-    subscriptionStatus: user.activeSubscription?.status,
-    subscriptionInterval: user.activeSubscription?.interval,
-    currentPeriodEnd: user.activeSubscription?.currentPeriodEnd
-  })
-
   if (!isAdmin && !hasActiveSubscription) {
-    console.log('Vote API - Access denied, no active subscription')
     return NextResponse.json(
       { error: 'You must be an active monthly subscriber to perform this action.' },
       { status: 403 }
@@ -84,14 +62,16 @@ export async function POST(
 
   // Get project (typed)
   const project = mongoose.Types.ObjectId.isValid(id)
-    ? await Project.findById(id).lean<IProject | null>()
+    ? await Project.findById(id)
     : null
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
-  if (project.status !== 'voting') {
-    return NextResponse.json({ error: 'Voting is not open for this project' }, { status: 400 })
+  
+  // Use helper method to check if project accepts votes
+  if (!project.acceptsVotes()) {
+    return NextResponse.json({ error: `Voting is not open for this project. Current status: ${project.status}` }, { status: 400 })
   }
 
   // ZIP rule
@@ -121,13 +101,20 @@ export async function POST(
     { $inc: inc },
     {
       new: true,
-      projection: { votesYes: 1, votesNo: 1, voteGoal: 1, status: 1 },
+      projection: { votesYes: 1, votesNo: 1, voteGoal: 1, fundingGoal: 1, totalRaised: 1, status: 1 },
     }
-  ).lean<Pick<IProject, 'votesYes' | 'votesNo' | 'voteGoal' | 'status'> | null>()
+  )
 
-  // Auto-advance to funding
-  if (updated && updated.status === 'voting' && Number(updated.votesYes) >= Number(updated.voteGoal)) {
-    await Project.updateOne({ _id: project._id }, { $set: { status: 'funding' } })
+  if (!updated) {
+    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 })
+  }
+
+  // Check if project is ready for build phase (both goals met)
+  if (updated.isReadyForBuild() && !updated.readyForBuildNotified) {
+    // Mark as ready for admin notification
+    await Project.findByIdAndUpdate(project._id, { 
+      readyForBuildNotified: false  // This will trigger admin notification
+    })
   }
 
   return NextResponse.json({

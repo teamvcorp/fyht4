@@ -82,11 +82,13 @@ export const authOptions: NextAuthOptions = {
         (token as any).id = token.sub
       }
 
-      // Refresh user data on sign-in, or if role/subscription is undefined, or periodically
+      // Refresh user data on sign-in, or if role/subscription is undefined, or periodically, or on explicit update
       const shouldRefresh = user || 
                            (token as any).role === undefined || 
                            (token as any).isSubscriber === undefined ||
-                           trigger === 'update'
+                           trigger === 'update' ||
+                           // Force refresh every request to catch role changes immediately (for admin elevation)
+                           true
 
       if (shouldRefresh) {
         try {

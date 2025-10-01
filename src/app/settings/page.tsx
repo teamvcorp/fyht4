@@ -10,6 +10,8 @@ import User from '@/models/User'
 import Link from 'next/link'
 import { SubscriptionCard } from '@/components/settings/SubscriptionCard'
 import { ProfileSettings } from '@/components/settings/ProfileSettings'
+import { WalletSettings } from '@/components/settings/WalletSettings'
+import { AdminElevation } from '@/components/settings/AdminElevation'
 
 export const metadata: Metadata = {
   title: 'Settings',
@@ -42,6 +44,8 @@ export default async function SettingsPage() {
     } : null,
     stripeCustomerId: userDoc.stripeCustomerId || null,
   }
+
+
 
   // Check if user has active subscription
   const hasActiveSubscription = Boolean(user.activeSubscription && 
@@ -116,6 +120,12 @@ export default async function SettingsPage() {
 
               {/* Sidebar */}
               <div className="space-y-6">
+                {/* Admin Role Management */}
+                <AdminElevation currentRole={user.role || 'user'} />
+
+                {/* Wallet Settings */}
+                <WalletSettings />
+
                 {/* Member Status */}
                 <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
                   <h3 className="font-display text-lg font-semibold text-neutral-900 mb-3">
@@ -162,6 +172,14 @@ export default async function SettingsPage() {
                     >
                       → View Dashboard
                     </Link>
+                    {user.role === 'admin' && (
+                      <Link
+                        href="/admin"
+                        className="block text-sm text-blue-600 hover:text-blue-800 font-medium transition"
+                      >
+                        🛡️ Admin Dashboard
+                      </Link>
+                    )}
                     <Link
                       href="/projects"
                       className="block text-sm text-neutral-600 hover:text-neutral-900 transition"

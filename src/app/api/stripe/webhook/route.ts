@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import dbConnect from '@/lib/mongoose'
 import User from '@/models/User'
+import WalletTransaction from '@/models/WalletTransaction'
 import type { Types } from 'mongoose'
 
 export const runtime = 'nodejs'
@@ -131,11 +132,7 @@ async function upsertUserFromSubscription(sub: Stripe.Subscription, session?: St
     email: emailFromSession,
   })
   if (!userId) {
-    console.warn('[stripe webhook] No matching user for subscription', sub.id, {
-      metaUserId,
-      customerId: snap.customerId,
-      emailFromSession,
-    })
+    console.warn('[stripe webhook] No matching user for subscription')
     return
   }
 
@@ -169,6 +166,66 @@ async function upsertUserFromSubscription(sub: Stripe.Subscription, session?: St
   )
 }
 
+/** Handle wallet funding when Stripe payment completes */
+async function handleWalletFunding(userId: string, amount: number, paymentIntentId: string) {
+  await dbConnect()
+  
+  // Get payment intent to check for payment method
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+  const paymentMethodId = typeof paymentIntent.payment_method === 'string' 
+    ? paymentIntent.payment_method 
+    : paymentIntent.payment_method?.id
+  
+  // Start database transaction for atomic operations
+  const session = await User.startSession()
+  
+  try {
+    await session.withTransaction(async () => {
+      // Get current user balance
+      const user = await User.findById(userId).select('walletBalance').session(session)
+      if (!user) {
+        throw new Error('User not found for wallet funding')
+      }
+
+      const currentBalance = user.walletBalance || 0
+      const newBalance = currentBalance + amount
+
+      // Update user wallet balance and save payment method for auto-refill
+      const updateData: any = {
+        $inc: { walletBalance: amount }
+      }
+      
+      // Save payment method for future auto-refill if available
+      if (paymentMethodId) {
+        updateData.$set = { stripePaymentMethodId: paymentMethodId }
+      }
+
+      await User.findByIdAndUpdate(userId, updateData, { session })
+
+      // Create wallet transaction record
+      const walletTransaction = new WalletTransaction({
+        userId,
+        type: 'credit',
+        amount,
+        description: `Wallet funding via Stripe: $${(amount / 100).toFixed(2)}`,
+        status: 'completed',
+        stripePaymentIntentId: paymentIntentId,
+        balanceBefore: currentBalance,
+        balanceAfter: newBalance,
+        metadata: {
+          paymentMethod: 'stripe_checkout',
+          paymentIntentId,
+          paymentMethodSaved: !!paymentMethodId
+        }
+      })
+
+      await walletTransaction.save({ session })
+    })
+  } finally {
+    await session.endSession()
+  }
+}
+
 export async function POST(req: Request) {
   const sig = req.headers.get('stripe-signature')
   if (!sig || !WEBHOOK_SECRET) {
@@ -185,6 +242,13 @@ export async function POST(req: Request) {
   }
 
   try {
+    await dbConnect()
+    
+    // Ensure models are registered
+    if (!WalletTransaction || !User) {
+      throw new Error('Required models not available')
+    }
+    
     switch (event.type) {
       /**
        * ————————————————————————————————————————————————————————————————
@@ -208,6 +272,14 @@ export async function POST(req: Request) {
         const email = session.customer_details?.email ?? null
 
         const userId = await resolveUserId({ metaUserId, customerId, email })
+
+        // Handle wallet funding
+        if (session.metadata?.type === 'wallet_funding' && userId) {
+          const amount = parseInt(session.metadata.amount || '0')
+          if (amount > 0) {
+            await handleWalletFunding(userId.toString(), amount, session.payment_intent as string)
+          }
+        }
 
         // If it was a subscription checkout, snapshot now
         if (session.mode === 'subscription' && typeof session.subscription === 'string') {

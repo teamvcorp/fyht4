@@ -129,6 +129,8 @@ export async function PATCH(
       title: prop.title,
       category: prop.category,
       zipcode: String(prop.zipcode),
+      city: prop.city || null,
+      state: prop.state || null,
       shortDescription: prop.shortDescription || '',
       description: prop.description || '',
       fundingGoal: Number(prop.fundingGoal || 0),

@@ -17,6 +17,7 @@ import ProjectGrid from '@/components/dashboard/ProjectGrid'
 import { ProjectRecommendations } from '@/components/ProjectRecommendations'
 import { AchievementSystem } from '@/components/AchievementSystem'
 import { OnboardingTour } from '@/components/OnboardingTour'
+import { AdminNotifications } from '@/components/dashboard/AdminNotifications'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -194,6 +195,15 @@ export default async function DashboardPage() {
           />
         </FadeIn>
       </Container>
+
+      {/* Admin Notifications - only shown to admins */}
+      {user.role === 'admin' && (
+        <Container className="mt-16 sm:mt-24">
+          <FadeIn>
+            <AdminNotifications />
+          </FadeIn>
+        </Container>
+      )}
 
       {/* Project Recommendations */}
       <Container className="mt-16 sm:mt-24">

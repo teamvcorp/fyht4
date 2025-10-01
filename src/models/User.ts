@@ -44,6 +44,13 @@ export interface IUser extends Document {
   activeSubscription?: IActiveSubscription | null
   lastPaidAt?: Date | null
 
+  // Wallet system
+  walletBalance?: number // cents, default 0
+  stripePaymentMethodId?: string | null // default payment method for auto-refill
+  autoRefillEnabled?: boolean // monthly auto-top-up
+  autoRefillAmount?: number // cents, how much to add when auto-refilling
+  lowBalanceThreshold?: number // cents, when to suggest top-up
+
   createdAt?: Date
   updatedAt?: Date
 }
@@ -81,6 +88,13 @@ const UserSchema = new Schema<IUser>(
     stripeCustomerId: { type: String, index: true, sparse: true },
     activeSubscription: { type: ActiveSubscriptionSchema, default: null },
     lastPaidAt: { type: Date, default: null },
+
+    // Wallet system
+    walletBalance: { type: Number, default: 0, min: 0 },
+    stripePaymentMethodId: { type: String, default: null },
+    autoRefillEnabled: { type: Boolean, default: false },
+    autoRefillAmount: { type: Number, default: 2500, min: 2500 }, // $25 minimum
+    lowBalanceThreshold: { type: Number, default: 1000 }, // $10 threshold for suggestions
   },
   { timestamps: true }
 )

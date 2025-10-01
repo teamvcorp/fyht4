@@ -7,6 +7,8 @@ export interface IProjectProposal extends Document {
   title: string
   category: string
   zipcode: string
+  city?: string
+  state?: string
   shortDescription: string
   description: string
   fundingGoal: number   // cents
@@ -23,6 +25,8 @@ const ProjectProposalSchema = new Schema<IProjectProposal>(
     title: { type: String, required: true, trim: true },
     category: { type: String, default: 'General', trim: true },
     zipcode: { type: String, required: true, trim: true, index: true },
+    city: { type: String, default: null, trim: true },
+    state: { type: String, default: null, trim: true },
     shortDescription: { type: String, default: '' },
     description: { type: String, default: '' },
     fundingGoal: { type: Number, required: true, min: 100 }, // store cents; min $1
