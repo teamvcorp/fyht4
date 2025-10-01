@@ -106,7 +106,6 @@ export const authOptions: NextAuthOptions = {
           ;(token as any).isSubscriber = newIsSubscriber
           
         } catch (error) {
-          console.error('JWT refresh error:', error)
           ;(token as any).role = (token as any).role ?? 'user'
           ;(token as any).zipcode = (token as any).zipcode ?? null
           ;(token as any).isSubscriber = false
