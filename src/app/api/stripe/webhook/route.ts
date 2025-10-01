@@ -42,9 +42,11 @@ function readPriceBasics(price: any) {
 /** Normalize subscription core fields for our snapshot */
 function normalizeSubscription(sub: Stripe.Subscription) {
   const currentPeriodEnd =
-    dual<number>(sub as any, 'current_period_end', 'currentPeriodEnd') ?? null
+    dual<number>(sub as any, 'current_period_end', 'currentPeriodEnd') ?? 
+    sub.current_period_end ?? null
   const cancelAtPeriodEnd =
-    dual<boolean>(sub as any, 'cancel_at_period_end', 'cancelAtPeriodEnd') ?? false
+    dual<boolean>(sub as any, 'cancel_at_period_end', 'cancelAtPeriodEnd') ?? 
+    sub.cancel_at_period_end ?? false
 
   const firstItem = (sub.items?.data?.[0] as any) || null
   const price = firstItem?.price || null

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { getAdminOrResponse } from '@/lib/guard'
-import { ObjectId } from 'mongodb'
+import mongoose from 'mongoose'
 import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
@@ -88,7 +88,7 @@ export async function PATCH(
 
   const prop = await db
     .collection('project_proposals')
-    .findOne({ _id: new ObjectId(id) })
+    .findOne({ _id: new mongoose.Types.ObjectId(id) })
 
   if (!prop) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -96,7 +96,7 @@ export async function PATCH(
   const submitter = prop.createdBy
     ? await db
         .collection('users')
-        .findOne({ _id: new ObjectId(prop.createdBy) }, { projection: { email: 1, name: 1 } })
+        .findOne({ _id: new mongoose.Types.ObjectId(prop.createdBy) }, { projection: { email: 1, name: 1 } })
     : null
 
   const site =

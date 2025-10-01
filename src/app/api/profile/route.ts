@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import clientPromise from '@/lib/mongodb'
-import { ObjectId } from 'mongodb'
+import dbconnect from '@/lib/mongoose'
+import UserModel from '@/models/User'
 
 export const runtime = 'nodejs'
 
@@ -10,12 +10,25 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const db = (await clientPromise).db()
-  const user = await db.collection('users').findOne(
-    { _id: new ObjectId(session.user.id) },
-    { projection: { name: 1, email: 1, zipcode: 1 } },
-  )
-  return NextResponse.json({ user })
+  await dbconnect()
+  const user = await UserModel.findById(session.user.id)
+    .select('name email zipcode activeSubscription stripeCustomerId')
+    .lean()
+  
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  // Check if user has active subscription
+  const hasActiveSubscription = Boolean(user.activeSubscription && 
+    ['active', 'trialing'].includes(user.activeSubscription.status))
+
+  return NextResponse.json({ 
+    user: {
+      ...user,
+      hasActiveSubscription
+    }
+  })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -29,10 +42,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid ZIP' }, { status: 400 })
   }
 
-  const db = (await clientPromise).db()
-  await db
-    .collection('users')
-    .updateOne({ _id: new ObjectId(session.user.id) }, { $set: { ...(name ? { name } : {}), ...(zipcode !== undefined ? { zipcode: String(zipcode) } : {}) } })
+  await dbconnect()
+  await UserModel.findByIdAndUpdate(
+    session.user.id,
+    { 
+      ...(name ? { name } : {}), 
+      ...(zipcode !== undefined ? { zipcode: String(zipcode) } : {}) 
+    }
+  )
 
   return NextResponse.json({ ok: true })
 }

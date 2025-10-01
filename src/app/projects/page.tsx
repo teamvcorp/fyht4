@@ -13,6 +13,7 @@ import { PageIntro } from '@/components/PageIntro'
 import ProjectsToolbar from '@/components/projects/ProjectsToolbar'
 import WatchButton from '@/components/projects/WatchButton'
 import VoteButtons from '@/components/projects/VoteButtons'
+import { VotingSystem } from '@/components/projects/VotingSystem'
 import DonateNowButton from '@/components/projects/DonateNowButton'
 
 
@@ -78,6 +79,8 @@ let canSubmit =
   Boolean(sUser?.hasActiveSubscription) || // legacy flag if you still set it
   ['active', 'trialing'].includes(String(sUser?.activeSubscription?.status || ''))
 
+let userZipcode: string | null = null
+
 // 2) Fallback: read from DB
 if (isMember && !canSubmit) {
   // Safely resolve the user doc even if the session id isn't a Mongo ObjectId
@@ -94,10 +97,12 @@ if (isMember && !canSubmit) {
           'activeSubscription.status': 1,
           'activeSubscription.currentPeriodEnd': 1,
           'activeSubscription.cancelAtPeriodEnd': 1,
+          'zipcode': 1,
         },
       }
     )
 
+    userZipcode = u?.zipcode || null
     const status = u?.activeSubscription?.status as
       | 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid'
       | undefined
@@ -115,6 +120,20 @@ if (isMember && !canSubmit) {
   } else {
     // No valid selector; safest default is false
     canSubmit = false
+  }
+} else if (isMember && canSubmit) {
+  // User can already submit, but we still need their zipcode
+  const selector =
+    (sUser?.id && ObjectId.isValid(String(sUser.id)))
+      ? { _id: new ObjectId(String(sUser.id)) }
+      : (sUser?.email ? { email: sUser.email.toLowerCase() } : null)
+
+  if (selector) {
+    const u = await db.collection('users').findOne(
+      selector,
+      { projection: { zipcode: 1 } }
+    )
+    userZipcode = u?.zipcode || null
   }
 }
 
@@ -151,7 +170,7 @@ if (isMember && !canSubmit) {
     .limit(48)
     .toArray()
 
-  const projects = serializeDocs(projectsRaw) as Array<
+  const projects = serializeDocs(projectsRaw) as any[] as Array<
     Omit<Project, '_id' | 'createdAt'> & { _id: string; createdAt?: string }
   >
 
@@ -271,7 +290,16 @@ if (isMember && !canSubmit) {
                       {isMember ? (
                         <>
                           <WatchButton projectId={p._id} initialWatching={false} />
-                          {p.status === 'voting' && <VoteButtons projectId={p._id} />}
+                          <VotingSystem
+                            projectId={p._id}
+                            projectStatus={p.status || 'draft'}
+                            projectZipcode={p.zipcode || ''}
+                            initialVotesYes={p.votesYes || 0}
+                            initialVotesNo={p.votesNo || 0}
+                            voteGoal={p.voteGoal || 0}
+                            userZipcode={userZipcode}
+                            hasActiveSubscription={canSubmit}
+                          />
                           <DonateNowButton projectId={p._id} projectTitle={p.title} />
                         </>
                       ) : (

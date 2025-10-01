@@ -1,5 +1,4 @@
 import { type Metadata } from 'next'
-import Image from 'next/image'
 
 import { Border } from '@/components/Border'
 import { ContactSection } from '@/components/ContactSection'
@@ -10,8 +9,6 @@ import { PageIntro } from '@/components/PageIntro'
 import { PageLinks } from '@/components/PageLinks'
 import { SectionIntro } from '@/components/SectionIntro'
 import { StatList, StatListItem } from '@/components/StatList'
-import imageLeslieAlexander from '@/images/team/leslie-alexander.jpg'
-import imageMichaelFoster from '@/images/team/michael-foster.jpg'
 import { loadArticles } from '@/lib/mdx'
 import { RootLayout } from '@/components/RootLayout'
 
@@ -53,12 +50,10 @@ const team = [
       {
         name: 'Robert Von Der Becke',
         role: 'Co-Founder / CEO',
-        image: { src: imageLeslieAlexander },
       },
       {
         name: 'Ryann Von Der Becke',
         role: 'Co-Founder / COO',
-        image: { src: imageMichaelFoster },
       },
     
     ],
@@ -88,11 +83,11 @@ function Team() {
                     <li key={person.name}>
                       <FadeIn>
                         <div className="group relative overflow-hidden rounded-3xl bg-neutral-100">
-                          <Image
-                            alt=""
-                            {...person.image}
-                            className="h-96 w-full object-cover grayscale transition duration-500 motion-safe:group-hover:scale-105"
-                          />
+                          <div className="h-96 w-full bg-gradient-to-br from-neutral-200 to-neutral-300 flex items-center justify-center">
+                            <div className="text-6xl text-neutral-400">
+                              {person.name.split(' ').map(n => n[0]).join('')}
+                            </div>
+                          </div>
                           <div className="absolute inset-0 flex flex-col justify-end bg-linear-to-t from-black to-black/0 to-40% p-6">
                             <p className="font-display text-base/6 font-semibold tracking-wide text-white">
                               {person.name}

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import clientPromise from '@/lib/mongodb'
-import { ObjectId } from 'mongodb'
+import dbConnect from '@/lib/mongoose'
+import Watchlist from '@/models/Watchlist'
+import mongoose from 'mongoose'
 
 export const runtime = 'nodejs'
 
@@ -13,9 +14,10 @@ export async function POST(req: NextRequest) {
   const { projectId } = await req.json()
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
 
-  const db = (await clientPromise).db()
-  await db.collection('watchlist').updateOne(
-    { userId: new ObjectId(session.user.id), projectId: new ObjectId(projectId) },
+  await dbConnect()
+  
+  await Watchlist.updateOne(
+    { userId: new mongoose.Types.ObjectId(session.user.id), projectId: new mongoose.Types.ObjectId(projectId) },
     { $setOnInsert: { createdAt: new Date() } },
     { upsert: true },
   )
@@ -29,10 +31,11 @@ export async function DELETE(req: NextRequest) {
   const projectId = new URL(req.url).searchParams.get('projectId')
   if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
 
-  const db = (await clientPromise).db()
-  await db.collection('watchlist').deleteOne({
-    userId: new ObjectId(session.user.id),
-    projectId: new ObjectId(projectId),
+  await dbConnect()
+  
+  await Watchlist.deleteOne({
+    userId: new mongoose.Types.ObjectId(session.user.id),
+    projectId: new mongoose.Types.ObjectId(projectId),
   })
   return NextResponse.json({ ok: true })
 }

@@ -61,7 +61,7 @@ export default function MembershipActions() {
           <p className="mt-1 text-sm">{niceError.body}</p>
           <div className="mt-2">
             <Link
-              href="/settings/connections"
+              href="/settings"
               className="inline-block rounded-xl border border-amber-300 px-3 py-1.5 text-sm font-semibold hover:border-amber-400"
             >
               Go to Settings → Connections
@@ -120,7 +120,7 @@ export default function MembershipActions() {
       {/* Always-visible helper for signed-in users */}
       <p className="mt-6 text-sm text-neutral-600">
         Already signed in?{' '}
-        <Link href="/settings/connections" className="underline hover:text-neutral-800">
+        <Link href="/settings" className="underline hover:text-neutral-800">
           Manage your connected accounts
         </Link>
         .

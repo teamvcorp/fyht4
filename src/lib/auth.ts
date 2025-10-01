@@ -74,7 +74,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       // Always keep an explicit id (besides token.sub)
       if (user) {
         (token as any).id = (user as any).id ?? (user as any)?._id?.toString() ?? token.sub
@@ -82,18 +82,37 @@ export const authOptions: NextAuthOptions = {
         (token as any).id = token.sub
       }
 
-      // Load role, zipcode, and subscription snapshot exactly once (or when fresh user)
-      if (user || (token as any).role === undefined || (token as any).isSubscriber === undefined) {
+      // Refresh user data on sign-in, or if role/subscription is undefined, or periodically
+      const shouldRefresh = user || 
+                           (token as any).role === undefined || 
+                           (token as any).isSubscriber === undefined ||
+                           trigger === 'update'
+
+      if (shouldRefresh) {
         try {
           await dbConnect()
           const userId = (token as any).id ?? token.sub
           const doc = await User.findById(userId)
             .select('activeSubscription role zipcode')
-            .lean<UserMeta | null>() // 👈 precise type here
-          ;(token as any).role = doc?.role ?? 'user'
-          ;(token as any).zipcode = doc?.zipcode ?? null
-          ;(token as any).isSubscriber = computeIsSubscriber(doc)
-        } catch {
+            .lean<UserMeta | null>()
+          
+          const newRole = doc?.role ?? 'user'
+          const newZipcode = doc?.zipcode ?? null
+          const newIsSubscriber = computeIsSubscriber(doc)
+          
+          // Always update these values from database
+          ;(token as any).role = newRole
+          ;(token as any).zipcode = newZipcode
+          ;(token as any).isSubscriber = newIsSubscriber
+          
+          console.log('JWT token refreshed:', {
+            userId,
+            role: newRole,
+            isSubscriber: newIsSubscriber,
+            subscription: doc?.activeSubscription
+          })
+        } catch (error) {
+          console.error('JWT refresh error:', error)
           ;(token as any).role = (token as any).role ?? 'user'
           ;(token as any).zipcode = (token as any).zipcode ?? null
           ;(token as any).isSubscriber = false

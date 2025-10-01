@@ -1,11 +1,12 @@
 // src/app/api/projects/[id]/vote/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ObjectId } from 'mongodb'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import mongoose, {Types} from 'mongoose'
 import dbConnect from '@/lib/mongoose'
-import { requireMonthlySubscriber } from '@/lib/guard'
 import UserModel, { IUser } from '@/models/User'
 import Project, { IProject } from '@/models/Project'
+import ProjectVote from '@/models/ProjectVote'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,10 +17,61 @@ export async function POST(
 ) {
   const { id } = await params
 
-  // Require active monthly subscriber (your guard returns Response or { session })
-  const gate = await requireMonthlySubscriber()
-  if (gate instanceof Response) return gate
-  const { session } = gate as { session: { user: { id: string } } }
+  // Get session first
+  const session = await getServerSession(authOptions)
+  console.log('Vote API - Session check:', {
+    hasSession: !!session,
+    userId: session?.user?.id,
+    email: session?.user?.email
+  })
+  
+  if (!session?.user?.id) {
+    console.log('Vote API - No session found, returning 401')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Do a real-time database check for subscription status (bypass JWT cache)
+  await dbConnect()
+  const user = await UserModel.findById(session.user.id)
+    .select('role activeSubscription zipcode')
+    .lean<Pick<IUser, '_id' | 'role' | 'activeSubscription' | 'zipcode'> | null>()
+
+  console.log('Vote API - User lookup:', {
+    userId: session.user.id,
+    foundUser: !!user,
+    userRole: user?.role,
+    hasActiveSubscription: user?.activeSubscription?.status
+  })
+
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  // Check if user has active monthly subscription
+  const hasActiveSubscription = user.activeSubscription ? 
+    (user.activeSubscription.status === 'active' || user.activeSubscription.status === 'trialing') &&
+    user.activeSubscription.interval === 'month' &&
+    user.activeSubscription.currentPeriodEnd &&
+    new Date(user.activeSubscription.currentPeriodEnd).getTime() > Date.now()
+    : false
+
+  const isAdmin = user.role === 'admin'
+
+  console.log('Vote API - Subscription check:', {
+    hasActiveSubscription,
+    isAdmin,
+    subscriptionStatus: user.activeSubscription?.status,
+    subscriptionInterval: user.activeSubscription?.interval,
+    currentPeriodEnd: user.activeSubscription?.currentPeriodEnd
+  })
+
+  if (!isAdmin && !hasActiveSubscription) {
+    console.log('Vote API - Access denied, no active subscription')
+    return NextResponse.json(
+      { error: 'You must be an active monthly subscriber to perform this action.' },
+      { status: 403 }
+    )
+  }
 
   // Validate body
   const body = await req.json().catch(() => ({}))
@@ -30,13 +82,8 @@ export async function POST(
 
   await dbConnect()
 
-  // Get user's zipcode (typed)
-  const user = await UserModel.findById(session.user.id)
-    .select('zipcode')
-    .lean<Pick<IUser, '_id' | 'zipcode'> | null>()
-
   // Get project (typed)
-  const project = ObjectId.isValid(id)
+  const project = mongoose.Types.ObjectId.isValid(id)
     ? await Project.findById(id).lean<IProject | null>()
     : null
 
@@ -52,17 +99,19 @@ export async function POST(
     return NextResponse.json({ error: 'You must live in the project ZIP to vote' }, { status: 403 })
   }
 
-  // One vote per user per project (unique index should enforce this)
+  // One vote per user per project (use Mongoose model now)
   try {
-    await mongoose.connection.collection('project_votes').insertOne({
-      projectId: project._id as Types.ObjectId,     // ✅ already an ObjectId
-      userId: new Types.ObjectId(session.user.id),  // ✅ use the same flavor
+    await ProjectVote.create({
+      projectId: project._id,
+      userId: session.user.id,
       zipcode: String(user.zipcode),
       value,
-      createdAt: new Date(),
     })
-  } catch {
-    return NextResponse.json({ error: 'You already voted on this project' }, { status: 409 })
+  } catch (error: any) {
+    if (error.code === 11000) { // Duplicate key error
+      return NextResponse.json({ error: 'You already voted on this project' }, { status: 409 })
+    }
+    throw error
   }
 
   // Increment counters (typed return)

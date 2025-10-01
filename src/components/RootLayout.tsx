@@ -126,7 +126,7 @@ function HeaderMenu({ invert = false }: { invert?: boolean }) {
             {session?.user ? (
               <>
                 <Link
-                  href="/settings/connections"
+                  href="/settings"
                   className={itemCls}
                   role="menuitem"
                 >

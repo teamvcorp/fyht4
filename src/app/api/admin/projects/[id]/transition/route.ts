@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/mongodb'
 import { getAdminOrResponse } from '@/lib/guard'
-import { ObjectId } from 'mongodb'
+import mongoose from 'mongoose'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +22,7 @@ req: NextRequest, ctx: { params: Promise<{ id: string }> }
       grandOpeningAt?: string
     }
 
-    const projectId = new ObjectId(id)
+    const projectId = new mongoose.Types.ObjectId(id)
     const project = await db.collection('projects').findOne({ _id: projectId })
     if (!project) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })

@@ -178,7 +178,7 @@ function Services() {
 
 export const metadata: Metadata = {
   description:
-    'We are a development studio working at the intersection of society and education.',
+    'Join FYHT4 Change to propose, vote on, and fund community projects. Democratic decision-making for local change.',
 }
 
 export default async function Home() {
@@ -196,19 +196,35 @@ export default async function Home() {
             aren’t privileges—they’re rights. No credit checks. No red tape.
             Just fairness, dignity, and action. Your effort—and your support—make it possible.
           </p>
-          <div className="mt-8 flex justify-center gap-4">
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
             <a
-              href="/donate"
-              className="rounded-2xl bg-emerald-600 px-6 py-3 text-lg font-semibold text-white shadow-lg hover:bg-emerald-700 transition"
+              href="/membership"
+              className="rounded-2xl bg-emerald-600 px-8 py-4 text-lg font-semibold text-white shadow-lg hover:bg-emerald-700 transition transform hover:scale-105"
             >
-              Donate Now
+              Join the Movement
             </a>
             <a
-              href="/process"
-              className="rounded-2xl border border-neutral-300 px-6 py-3 text-lg font-semibold text-neutral-700 hover:border-neutral-500 transition"
+              href="/projects"
+              className="rounded-2xl border border-neutral-300 px-8 py-4 text-lg font-semibold text-neutral-700 hover:border-neutral-500 hover:bg-neutral-50 transition"
             >
-              See How It Works
+              Explore Projects
             </a>
+          </div>
+          
+          {/* Quick stats */}
+          <div className="mt-12 grid grid-cols-3 gap-8 text-center">
+            <div>
+              <div className="text-3xl font-bold text-emerald-600">100%</div>
+              <div className="text-sm text-neutral-600">Community Driven</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-emerald-600">ZIP</div>
+              <div className="text-sm text-neutral-600">Code Democracy</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-emerald-600">0</div>
+              <div className="text-sm text-neutral-600">Red Tape</div>
+            </div>
           </div>
         </FadeIn>
       </Container>

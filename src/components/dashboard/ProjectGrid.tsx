@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
+import { VotingSystem } from '@/components/projects/VotingSystem'
 
 export default function ProjectGrid({
   items,
@@ -26,8 +28,30 @@ export default function ProjectGrid({
 }
 
 function ProjectCard({ project }: { project: any }) {
+  const { data: session } = useSession()
   const [watching, setWatching] = useState<boolean | null>(project._watching ?? null)
   const [busy, setBusy] = useState(false)
+  const [userZipcode, setUserZipcode] = useState<string | null>(null)
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
+
+  useEffect(() => {
+    if (session?.user) {
+      loadUserData()
+    }
+  }, [session])
+
+  const loadUserData = async () => {
+    try {
+      const res = await fetch('/api/profile')
+      const data = await res.json()
+      if (data.success) {
+        setUserZipcode(data.user.zipcode)
+        setHasActiveSubscription(data.user.hasActiveSubscription || false)
+      }
+    } catch (error) {
+      console.error('Failed to load user data:', error)
+    }
+  }
 
   async function toggleWatch() {
     try {
@@ -51,11 +75,19 @@ function ProjectCard({ project }: { project: any }) {
   return (
     <li className="rounded-2xl border border-neutral-200 bg-white p-4 flex flex-col">
       {project.coverImage ? (
-        <img
-          src={project.coverImage}
-          alt=""
-          className="h-40 w-full rounded-xl object-cover"
-        />
+        <div className="h-40 w-full rounded-xl overflow-hidden bg-neutral-100">
+          {/* Use regular img for external URLs to avoid Next.js config issues */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={project.coverImage}
+            alt=""
+            className="h-40 w-full rounded-xl object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.parentElement!.innerHTML = '<div class="h-40 w-full rounded-xl bg-neutral-100 flex items-center justify-center"><span class="text-neutral-400 text-sm">Image unavailable</span></div>'
+            }}
+          />
+        </div>
       ) : (
         <div className="h-40 w-full rounded-xl bg-neutral-100" />
       )}
@@ -65,6 +97,24 @@ function ProjectCard({ project }: { project: any }) {
         <p className="mt-1 text-sm text-neutral-700 line-clamp-3">{project.shortDescription}</p>
         <p className="mt-2 text-xs text-neutral-500">ZIP {project.zipcode}</p>
       </div>
+      
+      {/* Voting System for voting projects */}
+      {project.status === 'voting' && (
+        <div className="mt-3">
+          <VotingSystem
+            projectId={project._id}
+            projectStatus={project.status}
+            projectZipcode={project.zipcode}
+            initialVotesYes={project.votesYes || 0}
+            initialVotesNo={project.votesNo || 0}
+            voteGoal={project.voteGoal || 0}
+            userZipcode={userZipcode}
+            hasActiveSubscription={hasActiveSubscription}
+            className="text-sm"
+          />
+        </div>
+      )}
+      
       <div className="mt-4 flex gap-2">
         <a
           href={`/projects/${project._id}`}

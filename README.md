@@ -1,36 +1,52 @@
-# Studio
+# FYHT4 Change
 
-Studio is a [Tailwind Plus](https://tailwindcss.com/plus) site template built using [Tailwind CSS](https://tailwindcss.com) and [Next.js](https://nextjs.org).
+FYHT4 Change is a community-driven platform that empowers citizens to propose, vote on, and fund local projects. Built with Next.js, MongoDB, and Stripe for secure payments and membership management.
 
 ## Getting started
 
-To get started with this template, first install the npm dependencies:
+First, install the dependencies:
 
 ```bash
 npm install
 ```
 
-Next, run the development server:
+Set up your environment variables by copying `.env.example` to `.env.local` and filling in your credentials:
+
+- MongoDB connection string
+- NextAuth configuration
+- Stripe API keys
+- Email service credentials
+
+Run the development server:
 
 ```bash
 npm run dev
 ```
 
-Finally, open [http://localhost:3000](http://localhost:3000) in your browser to view the website.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-## Customizing
+## Features
 
-You can start editing this template by modifying the files in the `/src` folder. The site will auto-update as you edit these files.
+- **Project Submission**: Members can propose community projects
+- **Voting System**: ZIP code-based democratic voting on projects
+- **Membership Management**: Stripe-powered subscription system
+- **Donation Processing**: Secure payment handling for project funding
+- **Admin Dashboard**: Review and approve project proposals
+- **Impact Tracking**: Personal dashboard showing user contributions
 
-## License
+## Tech Stack
 
-This site template is a commercial product and is licensed under the [Tailwind Plus license](https://tailwindcss.com/plus/license).
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS
+- **Database**: MongoDB with Mongoose
+- **Authentication**: NextAuth.js
+- **Payments**: Stripe
+- **Email**: Resend
+- **Deployment**: Vercel-ready
 
-## Learn more
+## Project Structure
 
-To learn more about the technologies used in this site template, see the following resources:
-
-- [Tailwind CSS](https://tailwindcss.com/docs) - the official Tailwind CSS documentation
-- [Next.js](https://nextjs.org/docs) - the official Next.js documentation
-- [Framer Motion](https://www.framer.com/docs/) - the official Framer Motion documentation
-- [MDX](https://mdxjs.com/) - the official MDX documentation
+- `/src/app` - Next.js app router pages and API routes
+- `/src/components` - Reusable React components
+- `/src/models` - MongoDB/Mongoose schemas
+- `/src/lib` - Utility functions and configurations
+- `/src/types` - TypeScript type definitions

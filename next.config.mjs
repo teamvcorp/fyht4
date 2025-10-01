@@ -21,7 +21,53 @@ const nextConfig = {
       { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
       { protocol: 'https', hostname: 'pbs.twimg.com' },
       { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
+      // Allow Unsplash images for project covers
+      { protocol: 'https', hostname: 'unsplash.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
+    formats: ['image/webp', 'image/avif'],
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  // Improve performance
+  compress: true,
+  poweredByHeader: false,
+  // Enable experimental features for better performance
+  experimental: {
+    // optimizeCss: true, // Temporarily disabled due to critters module issue
+    scrollRestoration: true,
+  },
+  // Headers for better security and caching
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/images/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ]
   },
 }
 
