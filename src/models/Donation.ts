@@ -1,14 +1,26 @@
-import mongoose, {
-  Schema,
-  Types,
-  InferSchemaType,
-  HydratedDocument,
-  Model,
-} from 'mongoose'
+import mongoose, { Schema, Document, Types } from 'mongoose'
 
 export type DonationKind = 'one_time' | 'subscription'
+export type DonationSource = 'stripe' | 'wallet'
 
-const DonationSchema = new Schema(
+export interface IDonation extends Document {
+  userId?: Types.ObjectId | null
+  projectId?: Types.ObjectId | null
+  email?: string | null
+  externalId: string
+  source: DonationSource
+  kind: DonationKind
+  currency: string
+  amount: number
+  checkoutSessionId?: string | null
+  subscriptionId?: string | null
+  invoiceId?: string | null
+  campaign?: string | null
+  createdAt?: Date
+  updatedAt?: Date
+}
+
+const DonationSchema = new Schema<IDonation>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', default: null, index: true },
@@ -29,19 +41,7 @@ const DonationSchema = new Schema(
   { timestamps: true, collection: 'donations' }
 )
 
-type SchemaDonation = InferSchemaType<typeof DonationSchema>
-export interface IDonation extends SchemaDonation {
-  _id: Types.ObjectId
-  createdAt: Date
-  updatedAt: Date
-}
-export type DonationDoc = HydratedDocument<IDonation>
-
-const Donation =
-  (mongoose.models.Donation as Model<IDonation>) ||
-  mongoose.model<IDonation>('Donation', DonationSchema)
-
-export default Donation
+export default mongoose.models.Donation || mongoose.model<IDonation>('Donation', DonationSchema)
 
 // Helpers for populated results:
 export interface IDonationWithProject extends Omit<IDonation, 'projectId'> {
