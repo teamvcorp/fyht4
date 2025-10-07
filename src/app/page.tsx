@@ -75,7 +75,7 @@ function CaseStudies({
         className="mt-24 sm:mt-32 lg:mt-40"
       >
         <p>
-          We believe that everyone should have access to the same opportunities, regardless of their background or circumstances. Our projects showcase how we have helped familes achieve this goal through innovative solutions and a commitment to social responsibility.
+          We believe that everyone should have access to the same opportunities, regardless of their background or circumstances. Our projects showcase how we have helped families achieve this goal through innovative solutions and a commitment to social responsibility.
         </p>
       </SectionIntro>
       <Container className="mt-16">
