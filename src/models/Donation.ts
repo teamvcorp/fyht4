@@ -37,7 +37,7 @@ export interface IDonation extends SchemaDonation {
 }
 export type DonationDoc = HydratedDocument<IDonation>
 
-const Donation: Model<IDonation> =
+const Donation =
   (mongoose.models.Donation as Model<IDonation>) ||
   mongoose.model<IDonation>('Donation', DonationSchema)
 
