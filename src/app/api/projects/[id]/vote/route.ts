@@ -7,6 +7,8 @@ import dbConnect from '@/lib/mongoose'
 import UserModel, { IUser } from '@/models/User'
 import Project, { IProject } from '@/models/Project'
 import ProjectVote from '@/models/ProjectVote'
+import { checkRateLimit, rateLimiters } from '@/lib/rateLimit'
+import { safeObjectId } from '@/lib/mongoSafe'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +24,13 @@ export async function POST(
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Rate limit voting (moderate: 20/hour)
+  const identifier = `vote:${session.user.id}`
+  const rateLimitResult = checkRateLimit(identifier, rateLimiters.moderate)
+  if (!rateLimitResult.allowed) {
+    return rateLimitResult.response!
   }
 
   // Do a real-time database check for subscription status (bypass JWT cache)
@@ -60,10 +69,14 @@ export async function POST(
 
   await dbConnect()
 
+  // Safely convert project ID to ObjectId
+  const safeId = safeObjectId(id)
+  if (!safeId) {
+    return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+  }
+
   // Get project (typed)
-  const project = mongoose.Types.ObjectId.isValid(id)
-    ? await Project.findById(id)
-    : null
+  const project = await Project.findById(safeId)
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })

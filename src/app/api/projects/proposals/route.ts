@@ -5,6 +5,9 @@ import dbConnect from '@/lib/mongoose'
 import ProjectProposal from '@/models/ProjectProposal'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { sanitizeProjectData } from '@/lib/sanitize'
+import { validateZipcode, validateFundingGoal, validateVoteGoal } from '@/lib/validation'
+import { checkRateLimit, rateLimiters } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 
@@ -13,6 +16,14 @@ export async function POST(req: NextRequest) {
   if (gate instanceof Response) return gate
 
   const session = await getServerSession(authOptions)
+  
+  // Rate limit project submissions (moderate: 20/hour)
+  const identifier = `project-proposal:${(gate as any).session.user.id}`
+  const rateLimitResult = checkRateLimit(identifier, rateLimiters.moderate)
+  if (!rateLimitResult.allowed) {
+    return rateLimitResult.response!
+  }
+
   const body = await (async () => {
     const ct = req.headers.get('content-type') || ''
     if (ct.includes('application/json')) return req.json()
@@ -30,24 +41,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
+  // Validate zipcode
+  if (!validateZipcode(String(zipcode))) {
+    return NextResponse.json({ error: 'Invalid zipcode format' }, { status: 400 })
+  }
+
+  // Validate funding goal
   const fundingCents = Math.round(Number(fundingGoal) * 100)
+  const fundingValidation = validateFundingGoal(fundingCents / 100)
+  if (!fundingValidation.valid) {
+    return NextResponse.json({ error: fundingValidation.error }, { status: 400 })
+  }
+
+  // Validate vote goal
   const voteGoalNum = Number(voteGoal)
-  if (!Number.isFinite(fundingCents) || fundingCents < 100) {
-    return NextResponse.json({ error: 'Funding goal must be at least $1' }, { status: 400 })
+  const voteValidation = validateVoteGoal(voteGoalNum)
+  if (!voteValidation.valid) {
+    return NextResponse.json({ error: voteValidation.error }, { status: 400 })
   }
-  if (!Number.isFinite(voteGoalNum) || voteGoalNum < 1) {
-    return NextResponse.json({ error: 'Vote goal must be ≥ 1' }, { status: 400 })
-  }
+
+  // Sanitize all text inputs
+  const sanitized = sanitizeProjectData({
+    title: String(title),
+    category: category ? String(category) : 'General',
+    city: city ? String(city) : '',
+    state: state ? String(state) : '',
+    shortDescription: String(shortDescription),
+    description: String(description),
+  })
 
   await dbConnect()
   const doc = await ProjectProposal.create({
-    title: String(title).trim(),
-    category: category ? String(category).trim() : 'General',
+    title: sanitized.title,
+    category: sanitized.category,
     zipcode: String(zipcode),
-    city: city ? String(city).trim() : null,
-    state: state ? String(state).trim() : null,
-    shortDescription: String(shortDescription).trim(),
-    description: String(description).trim(),
+    city: sanitized.city || null,
+    state: sanitized.state || null,
+    shortDescription: sanitized.shortDescription,
+    description: sanitized.description,
     fundingGoal: fundingCents,
     voteGoal: voteGoalNum,
     createdBy: (gate as any).session.user.id,

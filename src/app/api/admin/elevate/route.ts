@@ -4,6 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import dbConnect from '@/lib/mongoose'
 import User from '@/models/User'
+import { checkRateLimit, rateLimiters } from '@/lib/rateLimit'
+import { logAudit } from '@/lib/auditLog'
+import crypto from 'crypto'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,12 +19,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    // Apply strict rate limiting (3 attempts per 15 minutes)
+    const identifier = `admin-elevate:${session.user.id}`
+    const rateLimitResult = checkRateLimit(identifier, rateLimiters.strict)
+    if (!rateLimitResult.allowed) {
+      return rateLimitResult.response!
+    }
+
     await dbConnect()
     
     const body = await req.json()
     const { password } = body
 
-    if (!password) {
+    if (!password || typeof password !== 'string') {
       return NextResponse.json({ error: 'Password is required' }, { status: 400 })
     }
 
@@ -34,8 +44,25 @@ export async function POST(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // Verify the password
-    if (password !== adminPassword) {
+    // Timing-safe password comparison to prevent timing attacks
+    const providedHash = crypto.createHash('sha256').update(password).digest()
+    const correctHash = crypto.createHash('sha256').update(adminPassword).digest()
+    
+    // Add random delay (50-150ms) to further prevent timing analysis
+    const randomDelay = 50 + Math.random() * 100
+    await new Promise(resolve => setTimeout(resolve, randomDelay))
+    
+    let isPasswordValid = false
+    try {
+      // Convert Buffer to Uint8Array for timingSafeEqual
+      const providedArray = new Uint8Array(providedHash)
+      const correctArray = new Uint8Array(correctHash)
+      isPasswordValid = crypto.timingSafeEqual(providedArray, correctArray)
+    } catch (error) {
+      isPasswordValid = false
+    }
+    
+    if (!isPasswordValid) {
       return NextResponse.json({ error: 'Invalid admin password' }, { status: 403 })
     }
 
@@ -50,8 +77,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Log the elevation for security purposes
-    // Admin elevation logged for security audit
+    // Log the elevation for security audit
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email || 'unknown',
+      action: 'admin.elevate',
+      resource: 'user',
+      resourceId: session.user.id,
+      req,
+      status: 'success',
+    })
 
     return NextResponse.json({
       success: true,

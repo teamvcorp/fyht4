@@ -49,7 +49,11 @@ function computeIsSubscriber(user: UserMeta | null | undefined) {
 
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
-  session: { strategy: 'jwt' },
+  session: { 
+    strategy: 'jwt',
+    maxAge: 30 * 60, // 30 minutes (improved security)
+    updateAge: 5 * 60, // Update session every 5 minutes
+  },
   pages: {
     signIn: '/membership',
     verifyRequest: '/membership/verify',

@@ -8,6 +8,9 @@ import Project from '@/models/Project'
 import Donation from '@/models/Donation'
 import WalletTransaction from '@/models/WalletTransaction'
 import { nanoid } from 'nanoid'
+import { checkRateLimit, rateLimiters } from '@/lib/rateLimit'
+import { safeObjectId } from '@/lib/mongoSafe'
+import { validateDonationAmount } from '@/lib/validation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +23,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    // Rate limit wallet donations (moderate: 20/hour)
+    const identifier = `wallet-donate:${session.user.id}`
+    const rateLimitResult = checkRateLimit(identifier, rateLimiters.moderate)
+    if (!rateLimitResult.allowed) {
+      return rateLimitResult.response!
+    }
+
     await dbConnect()
     
     // Ensure models are registered
@@ -30,16 +40,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { projectId, amount } = body
     
-    // Validate amount
-    const amountCents = Math.round(Number(amount) * 100)
-    if (!Number.isFinite(amountCents) || amountCents < 100) {
-      return NextResponse.json({ 
-        error: 'Invalid amount. Minimum donation is $1.' 
-      }, { status: 400 })
+    // Safely convert projectId to ObjectId
+    const safeId = safeObjectId(projectId)
+    if (!safeId) {
+      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
     }
+    
+    // Validate amount
+    const amountDollars = Number(amount)
+    const validation = validateDonationAmount(amountDollars)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    
+    const amountCents = Math.round(amountDollars * 100)
 
     // Validate project exists and accepts donations
-    const project = await Project.findById(projectId)
+    const project = await Project.findById(safeId)
       .select('title status zipcode')
 
     if (!project) {
@@ -114,7 +131,7 @@ export async function POST(req: NextRequest) {
           amount: amountCents,
           description: `Donation to "${project.title}"`,
           status: 'completed',
-          relatedProjectId: projectId,
+          relatedProjectId: safeId,
           balanceBefore: currentBalance,
           balanceAfter: currentBalance - amountCents,
           metadata: {
@@ -128,21 +145,21 @@ export async function POST(req: NextRequest) {
         // Create donation record
         const donation = new Donation({
           userId: session.user.id,
-          projectId: projectId,
+          projectId: safeId,
           email: user.email,
           externalId: `wallet_${nanoid()}`,
           source: 'wallet',
           kind: 'one_time',
           currency: 'usd',
           amount: amountCents,
-          campaign: projectId
+          campaign: String(safeId)
         })
 
         await donation.save({ session: session_db })
 
         // Update project total raised
         const updatedProject = await Project.findByIdAndUpdate(
-          projectId,
+          safeId,
           { $inc: { totalRaised: amountCents } },
           { new: true, session: session_db }
         )
@@ -150,7 +167,7 @@ export async function POST(req: NextRequest) {
         // Check if project is ready for build phase after this donation
         if (updatedProject?.isReadyForBuild() && !updatedProject.readyForBuildNotified) {
           await Project.findByIdAndUpdate(
-            projectId,
+            safeId,
             { readyForBuildNotified: false }, // Will trigger admin notification
             { session: session_db }
           )

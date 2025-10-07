@@ -26,14 +26,29 @@ The FYHT4 platform includes a secure admin role elevation system that allows aut
 
 ### Admin Features
 
-Once elevated to admin, users can:
+Once elevated to admin, users can access the admin dashboard at `/admin` with the following capabilities:
 
-- **Project Management**: View and update project statuses through the admin dashboard
-- **Build Phase Management**: Move projects from voting/funding to building phase
-- **Completion Tracking**: Mark projects as completed when construction is finished
-- **Real-time Notifications**: Receive alerts when projects meet their vote and funding goals
-- **User Administration**: Manage user accounts and roles (future feature)
-- **System Analytics**: View platform metrics and reports (future feature)
+#### Project Management (✅ Implemented)
+- **View All Projects**: See all projects sorted by zipcode
+- **Edit Projects**: Update project fields including:
+  - Title, Status, Category
+  - Zipcode, City, State  
+  - Vote Goal, Funding Goal
+- **Delete Projects**: Remove inappropriate or duplicate projects
+- **View Statistics**: See vote progress, funding progress, and creator information
+
+#### Proposal Management (✅ Implemented)
+- Review and approve/reject project proposals
+- Move proposals to active projects
+
+#### System Notifications (✅ Implemented)
+- Real-time alerts when projects meet vote and funding goals
+- Dashboard notifications for pending admin actions
+
+#### Future Features
+- **User Administration**: Manage user accounts and roles
+- **System Analytics**: View platform metrics and reports
+- **Bulk Operations**: Batch update multiple projects
 
 ### Security Notes
 
@@ -44,11 +59,52 @@ Once elevated to admin, users can:
 
 ### Admin Dashboard
 
-The admin dashboard (`/admin`) provides:
-- Project status overview
-- Pending actions notifications
-- Quick management tools
-- System status monitoring
+The admin dashboard is located at `/admin` and provides:
+
+#### Main Sections
+1. **Admin Stats Overview**
+   - Active Projects count
+   - Total Users count
+   - Pending proposals count
+   - System health metrics
+
+2. **Project Management Section** (✅ Main Feature)
+   - Table view of all projects sorted by zipcode
+   - **Edit Button**: Opens modal to modify:
+     - Title, Status, Category
+     - Zipcode, City, State
+     - Vote Goal, Funding Goal
+   - **Delete Button**: Removes projects with confirmation
+   - Real-time statistics (vote %, funding %)
+   - Creator information display
+
+3. **Admin Notifications**
+   - Alerts for projects ready for build phase
+   - Pending proposal reviews
+   - System notifications
+
+#### How to Use
+
+**Editing a Project:**
+1. Navigate to `/admin`
+2. Scroll to "Project Management" section
+3. Find the project in the table (sorted by zipcode)
+4. Click "Edit" button
+5. Modify fields in the modal
+6. Click "Save Changes"
+
+**Deleting a Project:**
+1. Navigate to `/admin`
+2. Find the project in the table
+3. Click "Delete" button
+4. Confirm deletion in the alert dialog
+
+**Security Features:**
+- ✅ Rate limiting on all admin operations
+- ✅ Input sanitization (XSS prevention)
+- ✅ MongoDB injection prevention
+- ✅ Audit logging for all admin actions
+- ✅ Session timeout (30 minutes)
 
 ### Troubleshooting
 

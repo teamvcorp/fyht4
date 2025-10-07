@@ -5,6 +5,11 @@ import { authOptions } from '@/lib/auth'
 import dbConnect from '@/lib/mongoose'
 import User from '@/models/User'
 import Project from '@/models/Project'
+import { sanitizeInput } from '@/lib/sanitize'
+import { safeObjectId } from '@/lib/mongoSafe'
+import { validateZipcode, validateFundingGoal, validateVoteGoal } from '@/lib/validation'
+import { checkRateLimit, rateLimiters } from '@/lib/rateLimit'
+import { logAudit } from '@/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     // Get all projects sorted by zipcode
     const projects = await Project.find({})
-      .select('title slug status zipcode city state category voteGoal votesYes votesNo fundingGoal totalRaised createdAt buildStartedAt completedAt createdBy')
+      .select('title slug status zipcode city state category shortDescription description voteGoal votesYes votesNo fundingGoal totalRaised createdAt buildStartedAt completedAt createdBy')
       .populate({
         path: 'createdBy',
         select: 'name email'
@@ -45,6 +50,8 @@ export async function GET(req: NextRequest) {
         city: p.city,
         state: p.state,
         category: p.category,
+        shortDescription: p.shortDescription,
+        description: p.description,
         voteGoal: p.voteGoal,
         votesYes: p.votesYes,
         votesNo: p.votesNo,
@@ -77,6 +84,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    // Rate limit admin updates (moderate)
+    const identifier = `admin-project-update:${session.user.id}`
+    const rateLimitResult = checkRateLimit(identifier, rateLimiters.moderate)
+    if (!rateLimitResult.allowed) {
+      return rateLimitResult.response!
+    }
+
     await dbConnect()
     
     // Check if user is admin
@@ -92,18 +106,62 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
-    // Validate updates
-    const allowedFields = ['status', 'voteGoal', 'fundingGoal', 'title', 'category', 'zipcode', 'city', 'state']
-    const filteredUpdates = Object.keys(updates)
-      .filter(key => allowedFields.includes(key))
-      .reduce((obj, key) => {
-        obj[key] = updates[key]
-        return obj
-      }, {} as any)
+    // Safely convert projectId to ObjectId
+    const safeId = safeObjectId(projectId)
+    if (!safeId) {
+      return NextResponse.json({ error: 'Invalid project ID format' }, { status: 400 })
+    }
+
+    // Validate and sanitize updates
+    const allowedFields = ['status', 'voteGoal', 'fundingGoal', 'title', 'category', 'zipcode', 'city', 'state', 'shortDescription', 'description']
+    const filteredUpdates: any = {}
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (!allowedFields.includes(key)) continue
+
+      // Sanitize string fields
+      if (key === 'title' || key === 'category' || key === 'city' || key === 'state' || key === 'shortDescription' || key === 'description') {
+        filteredUpdates[key] = sanitizeInput(String(value))
+      }
+      // Validate zipcode
+      else if (key === 'zipcode') {
+        const zipStr = String(value)
+        if (!validateZipcode(zipStr)) {
+          return NextResponse.json({ error: 'Invalid zipcode format' }, { status: 400 })
+        }
+        filteredUpdates[key] = zipStr
+      }
+      // Validate fundingGoal
+      else if (key === 'fundingGoal') {
+        const amount = Number(value)
+        const validation = validateFundingGoal(amount)
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 })
+        }
+        filteredUpdates[key] = amount
+      }
+      // Validate voteGoal
+      else if (key === 'voteGoal') {
+        const votes = Number(value)
+        const validation = validateVoteGoal(votes)
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 })
+        }
+        filteredUpdates[key] = votes
+      }
+      // Validate status
+      else if (key === 'status') {
+        const validStatuses = ['draft', 'voting', 'funding', 'build', 'completed', 'archived']
+        if (!validStatuses.includes(String(value))) {
+          return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
+        }
+        filteredUpdates[key] = String(value)
+      }
+    }
 
     // Update project
     const updatedProject = await Project.findByIdAndUpdate(
-      projectId,
+      safeId,
       { 
         ...filteredUpdates,
         // Set timestamps based on status changes
@@ -117,7 +175,17 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    // Admin action logged for audit
+    // Log admin action for audit trail
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email || 'unknown',
+      action: 'admin.project.update',
+      resource: 'project',
+      resourceId: projectId,
+      changes: filteredUpdates,
+      req,
+      status: 'success',
+    })
 
     return NextResponse.json({
       success: true,
@@ -148,6 +216,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    // Rate limit admin deletions (strict)
+    const identifier = `admin-project-delete:${session.user.id}`
+    const rateLimitResult = checkRateLimit(identifier, rateLimiters.strict)
+    if (!rateLimitResult.allowed) {
+      return rateLimitResult.response!
+    }
+
     await dbConnect()
     
     // Check if user is admin
@@ -163,16 +238,35 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
 
+    // Safely convert projectId to ObjectId
+    const safeId = safeObjectId(projectId)
+    if (!safeId) {
+      return NextResponse.json({ error: 'Invalid project ID format' }, { status: 400 })
+    }
+
     // Find the project first to log details
-    const project = await Project.findById(projectId).select('title status createdBy')
+    const project = await Project.findById(safeId).select('title status createdBy')
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     // Delete the project
-    await Project.findByIdAndDelete(projectId)
+    await Project.findByIdAndDelete(safeId)
 
-    // Admin deletion logged for audit
+    // Log admin deletion for audit trail
+    await logAudit({
+      userId: session.user.id,
+      userEmail: session.user.email || 'unknown',
+      action: 'admin.project.delete',
+      resource: 'project',
+      resourceId: projectId,
+      changes: {
+        title: project.title,
+        status: project.status,
+      },
+      req,
+      status: 'success',
+    })
 
     return NextResponse.json({
       success: true,

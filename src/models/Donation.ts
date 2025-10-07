@@ -15,7 +15,7 @@ const DonationSchema = new Schema(
     email: { type: String, default: null, index: true },
 
     externalId: { type: String, required: true, unique: true, index: true }, // idempotency key
-    source: { type: String, enum: ['stripe'], default: 'stripe' },
+    source: { type: String, enum: ['stripe', 'wallet'], default: 'stripe' },
     kind: { type: String, enum: ['one_time', 'subscription'], required: true, index: true },
     currency: { type: String, required: true, lowercase: true },
     amount: { type: Number, required: true, min: 0 },

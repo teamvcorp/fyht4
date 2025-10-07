@@ -9,25 +9,27 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 interface ProjectData {
   id: string
   title: string
-  slug: string
+  slug?: string
   status: 'draft' | 'voting' | 'funding' | 'build' | 'completed'
   zipcode: string
-  city: string
-  state: string
-  category: string
+  city?: string
+  state?: string
+  category?: string
+  shortDescription?: string
+  description?: string
   voteGoal: number
-  votesYes: number
-  votesNo: number
+  votesYes?: number
+  votesNo?: number
   fundingGoal: number
-  totalRaised: number
+  totalRaised?: number
   votePct: number
   fundPct: number
   createdAt: string
   buildStartedAt?: string
   completedAt?: string
   createdBy?: {
-    name: string
-    email: string
+    name?: string
+    email?: string
   }
 }
 
@@ -47,21 +49,25 @@ function EditModal({ project, isOpen, onClose, onSave }: EditModalProps) {
     category: '',
     zipcode: '',
     city: '',
-    state: ''
+    state: '',
+    shortDescription: '',
+    description: ''
   })
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (project) {
       setFormData({
-        title: project.title,
+        title: project.title || '',
         status: project.status,
-        voteGoal: project.voteGoal,
-        fundingGoal: project.fundingGoal,
-        category: project.category,
-        zipcode: project.zipcode,
-        city: project.city,
-        state: project.state
+        voteGoal: project.voteGoal || 0,
+        fundingGoal: project.fundingGoal || 0,
+        category: project.category || '',
+        zipcode: project.zipcode || '',
+        city: project.city || '',
+        state: project.state || '',
+        shortDescription: project.shortDescription || '',
+        description: project.description || ''
       })
     }
   }, [project])
@@ -96,6 +102,28 @@ function EditModal({ project, isOpen, onClose, onSave }: EditModalProps) {
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Short Description</label>
+            <input
+              type="text"
+              value={formData.shortDescription}
+              onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Brief summary for cards and previews"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Full Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              rows={4}
+              placeholder="Detailed project description"
             />
           </div>
 
@@ -385,7 +413,7 @@ export default function ProjectManagement() {
                     Votes: {project.votesYes}/{project.voteGoal} ({project.votePct}%)
                   </div>
                   <div>
-                    Funding: ${project.totalRaised.toLocaleString()}/${project.fundingGoal.toLocaleString()} ({project.fundPct}%)
+                    Funding: ${(project.totalRaised || 0).toLocaleString()}/${project.fundingGoal.toLocaleString()} ({project.fundPct}%)
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
